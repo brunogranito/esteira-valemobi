@@ -2382,6 +2382,7 @@ function renderBoard(){
       if(dp&&dp.stage!==s.id){
         removeFromOrder(dp.stage,dragId);
         addToOrder(s.id,dragId);
+        trackStageEntry(dragId,s.id);
         setP(dragId,{stage:s.id});
         refreshProgress(dragId);
         renderBoard();renderStats();
@@ -2424,6 +2425,7 @@ function renderBoard(){
           // coluna diferente → mover e inserir antes do card alvo
           removeFromOrder(dp.stage,dragId);
           addToOrder(s.id,dragId,p.id);
+          trackStageEntry(dragId,s.id);
           setP(dragId,{stage:s.id});
           refreshProgress(dragId);
           renderStats();
@@ -3129,16 +3131,19 @@ function renderReports(){
   active.forEach(p=>{Object.entries(p.taskDates||{}).forEach(([tid,dt])=>{if(!dt)return;const d=new Date(dt);rem.push({pname:p.name,pid:p.id,text:findTaskText(p,tid),d,past:d<=now});});
     if(p.cardReminder){const d=new Date(p.cardReminder);rem.push({pname:p.name+" (card)",pid:p.id,text:"Lembrete geral do card",d,past:d<=now});}
   });
-  // WEEKLY REPORT section
+  // RELATÓRIO SEMANAL — sempre exibido
   const weekAgo=new Date(Date.now()-7*86400000);
-  const changedThisWeek=active.filter(p=>{
-    return (p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo);
-  });
-  if(changedThisWeek.length){
-    h+=`<div class="rpt-section-title">📅 Movimentações desta semana
-      <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('semanal')">⬇ PDF Semanal</button>
-    </div>
-    <table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Movimentação</th><th>Stage atual</th></tr></thead><tbody>`;
+  const changedThisWeek=active.filter(p=>(p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo));
+  h+=`<div class="rpt-section-title">📅 Movimentações desta semana
+    <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('semanal')">⬇ PDF Semanal</button>
+  </div>`;
+  if(!changedThisWeek.length){
+    h+=`<div style="font-size:11px;color:#475569;padding:12px 0;text-align:center">
+      Nenhuma movimentação registrada esta semana.<br>
+      <span style="font-size:10px;color:#334155">Mova um card de stage para começar a registrar o histórico.</span>
+    </div>`;
+  } else {
+    h+=`<table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Movimentação</th><th>Stage atual</th></tr></thead><tbody>`;
     changedThisWeek.forEach(p=>{
       const recent=(p.stageHistory||[]).filter(h=>new Date(h.enteredAt)>=weekAgo);
       const st=STAGES.find(s=>s.id===p.stage);
