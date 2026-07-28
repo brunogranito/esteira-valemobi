@@ -1226,50 +1226,94 @@ function renderJiraPanel(){
 
 function renderJiraCfg(body){
   const cfgd=!!(jiraConfig.email&&jiraConfig.token);
-  const onGH=window.location.hostname.includes('github.io')||window.location.hostname.includes('localhost');
+  const tokenMask=jiraConfig.token?'••••••••'+jiraConfig.token.slice(-6):'';
   body.innerHTML=`
     <div style="font-size:11px;margin-bottom:14px;padding:10px 12px;background:rgba(6,182,212,.08);border-radius:7px;border-left:2px solid #06b6d4;line-height:1.6">
-      Credenciais salvas apenas no seu navegador (localStorage).
-      ${cfgd?'<span style="color:#10b981"> ✅ Jira configurado</span>':'<span style="color:#fbbf24"> ⚠️ Não configurado</span>'}
+      ${cfgd
+        ?`<span style="color:#10b981">✅ Jira configurado</span> — e-mail: <strong style="color:#e2e8f0">${jiraConfig.email}</strong>`
+        :'<span style="color:#fbbf24">⚠️ Não configurado</span> — preencha os campos abaixo'}
     </div>
 
     <div style="margin-bottom:16px;padding:12px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:7px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
-        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#e2e8f0;font-weight:600">
-          <input type="checkbox" id="jUseProxy" ${jiraConfig.useProxy!==false?'checked':''} style="accent-color:#06b6d4;width:14px;height:14px">
-          Usar proxy CORS (recomendado para GitHub Pages)
-        </label>
-      </div>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#e2e8f0;font-weight:600;margin-bottom:5px">
+        <input type="checkbox" id="jUseProxy" ${jiraConfig.useProxy!==false?'checked':''} style="accent-color:#06b6d4;width:14px;height:14px">
+        Usar proxy CORS (recomendado para GitHub Pages)
+      </label>
       <div style="font-size:10px;color:#94a3b8;line-height:1.5">
-        O Atlassian bloqueia chamadas diretas do browser. O proxy <strong style="color:#fbbf24">corsproxy.io</strong> 
-        atua como intermediário server-side, eliminando o bloqueio. 
-        O token de API trafega pelo proxy — risco aceitável para uso pessoal.
+        Necessário quando acessado via GitHub Pages — sem isso ocorre bloqueio CORS.
       </div>
     </div>
 
     <div class="jira-cfg-row"><span class="jira-cfg-lbl">Seu e-mail Atlassian</span>
-      <input class="jira-inp" id="jEmail" value="${jiraConfig.email}" placeholder="usuario@valemobi.com.br"></div>
-    <div class="jira-cfg-row"><span class="jira-cfg-lbl">API Token</span>
-      <input class="jira-inp" id="jToken" type="password" value="${jiraConfig.token}" placeholder="ATATT3...">
+      <input class="jira-inp" id="jEmail" value="${jiraConfig.email||''}" placeholder="usuario@valemobi.com.br"></div>
+
+    <div class="jira-cfg-row"><span class="jira-cfg-lbl">API Token
+      ${cfgd?`<span style="color:#10b981;font-weight:600;margin-left:8px">✅ Token salvo</span>`:''}
+    </span>
+      <div style="position:relative">
+        <input class="jira-inp" id="jToken" autocomplete="off" spellcheck="false"
+          placeholder="${cfgd?'Deixe em branco para manter o token atual':'Cole o novo token aqui (ATATT3…)'}"
+          style="padding-right:70px">
+        <button onclick="toggleTokenVis()" id="jTokenVisBtn"
+          style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;font-size:11px">
+          👁 Ver
+        </button>
+      </div>
+      ${cfgd?`<div style="font-size:10px;color:#475569;margin-top:3px">Token atual: <code style="color:#06b6d4">${tokenMask}</code> — só preencha para alterar</div>`:''}
       <div style="font-size:10px;color:#475569;margin-top:3px">Gerar em: <a href="https://id.atlassian.com/manage-api-tokens" target="_blank" style="color:#38bdf8">id.atlassian.com/manage-api-tokens</a></div>
     </div>
+
     <div class="jira-cfg-row"><span class="jira-cfg-lbl">Domínio Jira</span>
-      <input class="jira-inp" id="jDomain" value="${jiraConfig.domain}" placeholder="valemobi.atlassian.net"></div>
-    <button class="jira-btn" onclick="saveJiraCfg()">Salvar configuração</button>
+      <input class="jira-inp" id="jDomain" value="${jiraConfig.domain||'valemobi.atlassian.net'}" placeholder="valemobi.atlassian.net"></div>
+
+    <button class="jira-btn" onclick="saveJiraCfg()">💾 Salvar configuração</button>
     ${cfgd?`<button class="jira-btn-sec" id="jTestBtn" style="margin-top:8px;width:100%" onclick="testJira()">🔌 Testar conexão</button>`:''}
+    <div id="jSaveConfirm" style="display:none;margin-top:10px;padding:9px 12px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:6px;font-size:11px;color:#10b981"></div>
   `;
 }
 
+let tokenVisible=false;
+function toggleTokenVis(){
+  const inp=document.getElementById('jToken');
+  const btn=document.getElementById('jTokenVisBtn');
+  if(!inp)return;
+  tokenVisible=!tokenVisible;
+  inp.type=tokenVisible?'text':'password';
+  if(btn)btn.textContent=tokenVisible?'🙈 Ocultar':'👁 Ver';
+}
+
 function saveJiraCfg(){
-  jiraConfig={
-    email:(document.getElementById('jEmail')?.value||'').trim(),
-    token:(document.getElementById('jToken')?.value||'').trim(),
-    domain:(document.getElementById('jDomain')?.value||'').trim()||'valemobi.atlassian.net',
-    useProxy:document.getElementById('jUseProxy')?.checked!==false,
-  };
+  const email=(document.getElementById('jEmail')?.value||'').trim();
+  const newToken=(document.getElementById('jToken')?.value||'').trim();
+  const domain=(document.getElementById('jDomain')?.value||'').trim()||'valemobi.atlassian.net';
+  const useProxy=document.getElementById('jUseProxy')?.checked!==false;
+
+  // CRÍTICO: preservar token existente se campo vazio
+  const token=newToken||jiraConfig.token||'';
+
+  if(!email){showToast('⚠️ E-mail obrigatório','Preencha o e-mail Atlassian.');return;}
+  if(!token){showToast('⚠️ Token obrigatório','Cole o API Token do Atlassian.');return;}
+
+  jiraConfig={email,token,domain,useProxy};
+
+  // Salva na localStorage (inclui token)
   lsSet('jira',jiraConfig);
-  showToast('✅ Jira configurado!','Credenciais salvas no browser.');
-  renderJiraPanel();
+
+  // Salva config sem token no Supabase (para persistir entre dispositivos)
+  sbSet('jira_cfg',{email,domain,useProxy}).catch(()=>{});
+
+  // Feedback visual claro
+  const confirm=document.getElementById('jSaveConfirm');
+  if(confirm){
+    confirm.style.display='block';
+    confirm.innerHTML=`✅ Salvo com sucesso!<br>
+      <span style="color:#94a3b8">E-mail: ${email} · Domínio: ${domain} · Proxy: ${useProxy?'Ativo':'Inativo'}</span>`;
+  }
+  showToast('✅ Jira salvo!',`${email} · ${domain}`);
+  logActivity('Jira configurado',`${email} · proxy=${useProxy}`);
+
+  // Re-render após 1.5s para mostrar status atualizado
+  setTimeout(()=>renderJiraPanel(),1500);
 }
 
 async function testJira(){
@@ -3545,10 +3589,26 @@ async function initApp(){
 
   try{
     // 1. Tentar carregar projetos do Supabase
-    const [sbProjects, sbOrders] = await Promise.all([
+    const [sbProjects, sbOrders, sbJiraCfg] = await Promise.all([
       sbGet('projects'),
       sbGet('orders'),
+      sbGet('jira_cfg'),  // config sem token (email, domain, useProxy)
     ]);
+
+    // Merge Supabase jira_cfg with localStorage token
+    if(sbJiraCfg){
+      const localJira=lsGet('jira')||{};
+      if(!localJira.token&&jiraConfig.token){
+        // Já temos token na variável, só atualiza email/domain
+      }
+      jiraConfig={
+        email:localJira.email||sbJiraCfg.email||'',
+        token:localJira.token||jiraConfig.token||'',
+        domain:localJira.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
+        useProxy:localJira.useProxy!==undefined?localJira.useProxy:sbJiraCfg.useProxy!==false,
+      };
+      if(jiraConfig.email) lsSet('jira',jiraConfig);
+    }
 
     if(sbProjects?.length){
       // Supabase tem dados — usar esses (mais recentes)
