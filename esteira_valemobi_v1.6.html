@@ -656,11 +656,10 @@ body.light .sr-title{color:#1e293b}
     <div class="hd-right">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input class="search-bar" id="searchBar" placeholder="Buscar em toda a plataforma…"
+        <input class="search-bar" id="searchBar" type="search" placeholder="Buscar em toda a plataforma…"
           oninput="globalSearch(this.value)"
-          onkeydown="if(event.key='Escape'){this.value='';closeSearch();}"
-          autocomplete="off">
-        <div id="searchResults"></div>
+          onkeydown="if(event.key==='Escape'){this.value='';closeSearch();}"
+          autocomplete="off" spellcheck="false">
       </div>
       <div class="stat-row" id="stats"></div>
       <div class="sb-badge syncing" id="sbBadge" title="Status da sincronização com Supabase">
@@ -815,6 +814,8 @@ body.light .sr-title{color:#1e293b}
     <button class="link-cancel-btn" onclick="closeLinkModal()">Cancelar</button>
   </div>
 </div>
+
+<div id="searchResults"></div>
 
 <div id="atDropdown"></div>
 <div id="toastWrap"></div>
