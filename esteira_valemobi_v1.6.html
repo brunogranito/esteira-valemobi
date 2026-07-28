@@ -2429,8 +2429,8 @@ let searchTimeout=null;
 function globalSearch(q){
   q=(q||'').trim();
   if(searchTimeout) clearTimeout(searchTimeout);
-  if(!q){closeSearch();return;}
-  searchTimeout=setTimeout(()=>runSearch(q),200);
+  if(!q||q.length<2){closeSearch();return;}
+  searchTimeout=setTimeout(()=>runSearch(q),250);
 }
 function closeSearch(){
   const el=document.getElementById('searchResults');
