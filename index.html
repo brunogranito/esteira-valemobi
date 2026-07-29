@@ -1447,6 +1447,7 @@ function renderJiraImport(body){
   document.getElementById('jImportKey').focus();
 }
 
+let _lastJiraPreview=null;
 async function fetchJiraPreview(){
   const key=(document.getElementById('jImportKey')?.value||'').trim().toUpperCase();
   if(!key){showToast('Informe o código','Ex: BAPG-1669');return;}
@@ -1494,41 +1495,28 @@ async function fetchJiraPreview(){
     </div>
     ${alreadyImported
       ?`<div style="font-size:11px;color:#fbbf24;margin-top:10px">⚠️ Este ticket já existe na esteira (código: ${key})</div>
-         <button class="jira-btn" style="margin-top:8px" onclick="doImportJira('${issue.key}',${JSON.stringify(f?.summary).replace(/'/g,"\\'")})" >Importar mesmo assim</button>`
-      :`<button class="jira-btn" style="margin-top:10px" onclick="doImportJira('${issue.key}','${(f?.summary||'').replace(/'/g,"\\'")}')">📥 Importar como card</button>`
+         <button class="jira-btn" style="margin-top:8px;width:100%" onclick="doImportJira()">Importar mesmo assim</button>`
+      :`<button class="jira-btn" style="margin-top:10px;width:100%" onclick="doImportJira()">📥 Importar como card</button>`
     }
   `;
 }
 
-// Cache do último issue buscado no preview
-let _lastJiraPreview = null;
-
-async function doImportJira(key,summary){
+async function doImportJira(){
+  if(!_lastJiraPreview){showToast('⚠️ Preview expirado','Busque o ticket novamente.');return;}
+  const issue=_lastJiraPreview;
   const stage=document.getElementById('jImportStage')?.value||'escopo';
-
-  // Usar dados já buscados no preview (sem segunda chamada ao Jira)
-  let issue=_lastJiraPreview&&_lastJiraPreview.key===key?_lastJiraPreview:null;
-
-  // Só busca novamente se não tiver o cache
-  if(!issue){
-    const btn=document.querySelector('.jira-btn[onclick*="doImportJira"]');
-    if(btn){btn.textContent='⏳ Importando…';btn.disabled=true;}
-    issue=await jiraFetch(`issue/${key}?fields=summary,status,priority,assignee,description,updated`);
-    if(!issue){
-      showToast('❌ Erro ao importar','Não foi possível buscar o ticket. Tente novamente.');
-      if(btn){btn.textContent='📥 Importar como card';btn.disabled=false;}
-      return;
-    }
-  }
-
+  const btn=document.querySelector('#jPreview .jira-btn');
+  if(btn){btn.textContent='⏳ Importando…';btn.disabled=true;}
   const card=jiraIssueToCard(issue);
   card.stage=stage;
+  card.jiraStatus=issue.fields?.status?.name||'';
+  card.jiraStatusCat=issue.fields?.status?.statusCategory?.key||'';
   projects.push(card);
   saveProjects();
   refreshProgress(card.id);
   renderBoard();renderStats();
-  logActivity('Card importado do Jira',`${key} — ${summary}`,card.id,summary);
-  showToast('✅ Importado!',`"${summary||key}" adicionado como ${STAGES.find(s=>s.id===stage)?.label||stage}.`);
+  logActivity('Card importado do Jira',`${issue.key} — ${card.name}`,card.id,card.name);
+  showToast('✅ Importado!',`"${card.name}" → ${STAGES.find(s=>s.id===stage)?.label||stage}`);
   _lastJiraPreview=null;
   closeJiraPanel();
 }
@@ -1574,6 +1562,8 @@ async function syncOneCard(pid){
     const assignee=f?.assignee?.displayName||'?';
     const updated=f?.updated?new Date(f.updated).toLocaleDateString('pt-BR'):'?';
     results.push({code,statusName,sugStage,assignee,updated,statusCat:f?.status?.statusCategory?.key||'TODO'});
+    // Atualiza jiraStatus no card
+    if(statusName&&statusName!=='?') setP(pid,{jiraStatus:statusName,jiraStatusCat:f?.status?.statusCategory?.key||''});
   }
   if(!results.length){if(el)el.innerHTML=`<span class="jira-err">Não foi possível buscar.</span>`;return;}
   const r=results[0];
@@ -3429,6 +3419,9 @@ function closeModal(){document.getElementById("modalBg").classList.remove("open"
 
 function renderModal(){
   const p=getP(selId);if(!p)return;
+  // Fix 4: sempre resetar visual das abas para Informações ao abrir
+  const tabs=["info","check","ia","jira","mtg","dep"];
+  document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===curTab));
   const st=STAGES.find(s=>s.id===p.stage);
   document.getElementById("mCode").innerHTML=`<span onclick="startEditCode()" title="Clique para editar" style="cursor:text;border-bottom:1px dashed rgba(6,182,212,.4)">${p.code}</span>`;
   document.getElementById("mName").innerHTML=`<span onclick="startEditName()" title="Clique para editar o nome" style="cursor:text">${p.name}</span>`;
@@ -3438,6 +3431,7 @@ function renderModal(){
     p.owner?`<span class="tag">👤 ${p.owner}</span>`:"",
     p.qa?`<span class="tag">✅ ${p.qa}</span>`:"",
     p.rmdDate?`<span class="tag" style="border-color:rgba(139,92,246,.5);color:#c084fc">🗓 ${p.rmdDate}</span>`:"",
+    p.jiraStatus?`<span class="tag" style="border-color:rgba(6,182,212,.35);color:#38bdf8" title="Status no Jira">🎯 Jira: ${p.jiraStatus}</span>`:"",
   ].filter(Boolean).join("");
   document.getElementById("mMeta").innerHTML=tags;
   // sync modal bell
@@ -3648,8 +3642,14 @@ function renderTaskRow(p,tid,task,isCustom,activeStage){
   h+=`</div></div>`;
   // reminder row — hidden by default, toggle on bell click
   h+=`<div class="task-remind-expand" id="remind-${tid}">
-    <input class="task-due-inp" type="datetime-local" value="${due}" onchange="setTaskDue('${tid}','${activeStage}',this.value)">
-    ${hasDue?`<button onclick="setTaskDue('${tid}','${activeStage}','')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;margin-top:3px">✕ Remover lembrete</button>`:""}
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <input class="task-due-inp" type="datetime-local" value="${due}" id="remind-inp-${tid}">
+      <button onclick="setTaskDue('${tid}','${activeStage}',document.getElementById('remind-inp-${tid}').value);toggleReminderRow('${tid}')"
+        style="background:rgba(6,182,212,.2);border:1px solid rgba(6,182,212,.4);color:#38bdf8;padding:3px 10px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">
+        ✓ OK
+      </button>
+      ${hasDue?`<button onclick="setTaskDue('${tid}','${activeStage}','');toggleReminderRow('${tid}')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px">✕ Remover</button>`:""}
+    </div>
   </div>`;
   // expanded detail
   if(exp&&hasDetail){
