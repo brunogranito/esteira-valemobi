@@ -2744,8 +2744,8 @@ function renderLinkSuggList(q){
   Object.entries(groupMap).forEach(([grp,items])=>{
     h+=`<div class="link-sugg-sec">${grp}</div>`;
     items.forEach(s=>{
-      const safeN=s.name.replace(/\/g,'\\').replace(/'/g,"\'");
-      const safeU=s.url.replace(/\/g,'\\').replace(/'/g,"\'");
+      const safeN=(s.name||'').split("'").join("&#39;");
+      const safeU=(s.url||'').split("'").join("&#39;");
       h+=`<div class="link-sugg-item" onclick="fillLinkSugg('${safeN}','${safeU}')">
         <div class="link-sugg-name">${s.icon} ${s.name}${s.card?` <span style="color:#475569;font-size:9px">· ${s.card}</span>`:''}</div>
         <div class="link-sugg-url">${s.url}</div>
