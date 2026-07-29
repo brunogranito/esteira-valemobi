@@ -2110,12 +2110,31 @@ async function doLogin(){
   const pass=document.getElementById('loginPass')?.value||'';
   const errEl=document.getElementById('loginErr');
   if(!email||!pass){errEl.textContent='Preencha e-mail e senha.';return;}
-  errEl.textContent='Verificando…';
+
+  errEl.textContent='Buscando usuário…';
   const user=await sbGetUser(email);
   if(!user){errEl.textContent='E-mail não encontrado. Verifique ou crie uma conta.';return;}
-  if(!user.password_hash){errEl.textContent='Erro interno: hash ausente. Recrie sua conta.';return;}
-  const hash=await hashPw(pass);
-  if(hash!==user.password_hash){errEl.textContent='Senha incorreta. Tente novamente.';return;}
+  if(!user.password_hash){errEl.textContent='Erro: hash ausente no banco. Recrie sua conta.';return;}
+
+  errEl.textContent='Verificando senha…';
+  let hash;
+  try{
+    hash=await hashPw(pass);
+  }catch(e){
+    // Fallback: tenta hashlib-style se SubtleCrypto falhar
+    console.error('hashPw falhou:',e);
+    errEl.textContent='Erro ao processar senha: '+e.message;
+    return;
+  }
+
+  if(hash!==user.password_hash){
+    errEl.textContent='Senha incorreta. Tente novamente.';
+    console.warn('Hash esperado:',user.password_hash.slice(0,10)+'...');
+    console.warn('Hash calculado:',hash.slice(0,10)+'...');
+    return;
+  }
+
+  errEl.textContent='Entrando…';
   currentUser=user;
   lsSet('session',{id:user.id,email:user.email,name:user.name,role:user.role});
   sbUpdateLastLogin(user.id);
