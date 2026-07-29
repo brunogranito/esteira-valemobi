@@ -2034,7 +2034,7 @@ let currentUser = null;
 
 async function sbGetUser(email){
   try{
-    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id,email,name,role,last_login`);
+    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id,email,name,role,last_login,password_hash`);
     if(!r.ok)return null;
     const d=await r.json();
     return d?.[0]||null;
@@ -2096,9 +2096,10 @@ async function doLogin(){
   if(!email||!pass){errEl.textContent='Preencha e-mail e senha.';return;}
   errEl.textContent='Verificando…';
   const user=await sbGetUser(email);
-  if(!user){errEl.textContent='E-mail não encontrado.';return;}
+  if(!user){errEl.textContent='E-mail não encontrado. Verifique ou crie uma conta.';return;}
+  if(!user.password_hash){errEl.textContent='Erro interno: hash ausente. Recrie sua conta.';return;}
   const hash=await hashPw(pass);
-  if(hash!==user.password_hash){errEl.textContent='Senha incorreta.';return;}
+  if(hash!==user.password_hash){errEl.textContent='Senha incorreta. Tente novamente.';return;}
   currentUser=user;
   lsSet('session',{id:user.id,email:user.email,name:user.name,role:user.role});
   sbUpdateLastLogin(user.id);
