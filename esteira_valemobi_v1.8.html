@@ -4533,69 +4533,48 @@ async function sendAI(){
 async function initApp(){
   setSbBadge('syncing','Conectando à nuvem…');
 
-  try{
-    // 1. Tentar carregar projetos do Supabase
-    const [sbProjects, sbOrders, sbJiraCfg] = await Promise.all([
-      sbGet('projects'),
-      sbGet('orders'),
-      sbGet('jira_cfg'),  // config sem token (email, domain, useProxy)
-    ]);
+  // Timeout 5s — evita travar infinitamente se Supabase não responder
+  const T=(p)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]);
 
-    // Merge Supabase jira_cfg with localStorage token
-    if(sbJiraCfg){
-      const localJira=lsGet('jira')||{};
-      if(!localJira.token&&jiraConfig.token){
-        // Já temos token na variável, só atualiza email/domain
-      }
-      jiraConfig={
-        email:localJira.email||sbJiraCfg.email||'',
-        token:localJira.token||jiraConfig.token||'',
-        domain:localJira.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
-        useProxy:localJira.useProxy!==undefined?localJira.useProxy:sbJiraCfg.useProxy!==false,
-      };
-      if(jiraConfig.email) lsSet('jira',jiraConfig);
-    }
+  try{
+    const [sbProjects,sbOrders,sbJiraCfg]=await T(Promise.all([
+      sbGet('projects'),sbGet('orders'),sbGet('jira_cfg'),
+    ]));
 
     if(sbProjects?.length){
-      // Supabase tem dados — usar esses (mais recentes)
-      projects=sbProjects;
-      lsSet('projects',projects); // sincronizar localStorage
+      projects=sbProjects;lsSet('projects',projects);
     } else {
-      // Supabase vazio — carregar do localStorage (migração)
       loadProjectsLocal();
-      if(projects.length>0){
-        // Migrar localStorage → Supabase
-        setSbBadge('syncing','Migrando dados para a nuvem…');
-        await sbSet('projects',projects);
-      }
+      if(projects.length) sbSet('projects',projects).catch(()=>{});
     }
-
     if(sbOrders&&Object.keys(sbOrders).length){
-      stageOrders=sbOrders;
-      lsSet('orders',stageOrders);
+      stageOrders=sbOrders;lsSet('orders',stageOrders);
     } else {
       loadOrdersLocal();
-      if(Object.keys(stageOrders).length>0) await sbSet('orders',stageOrders);
+      if(Object.keys(stageOrders).length) sbSet('orders',stageOrders).catch(()=>{});
     }
-
+    if(sbJiraCfg){
+      const lj=lsGet('jira')||{};
+      jiraConfig={email:lj.email||sbJiraCfg.email||'',token:lj.token||jiraConfig.token||'',
+        domain:lj.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
+        useProxy:lj.useProxy!==undefined?lj.useProxy:sbJiraCfg.useProxy!==false};
+      if(jiraConfig.email)lsSet('jira',jiraConfig);
+    }
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     setSbBadge('synced',`☁ Sincronizado às ${now}`);
 
   }catch(e){
-    // Supabase indisponível — usar localStorage
-    loadProjectsLocal();
-    loadOrdersLocal();
+    loadProjectsLocal();loadOrdersLocal();
     setSbBadge('offline','⚠ Offline — dados locais');
-    console.warn('Supabase indisponível:',e);
+    console.warn('Supabase:',e.message);
   }
 
-  // Auto-calcular progresso de todos os projetos
+  // Sempre renderizar (independente do Supabase)
   projects=projects.map(p=>{
     if(p.archived)return p;
     try{const pct=autoProgress(p);return pct!==p.progress?{...p,progress:pct}:p;}
     catch(e){return p;}
   });
-
   loadMenuData();
   renderBoard();
   renderStats();
@@ -4604,9 +4583,8 @@ async function initApp(){
   setInterval(checkReminders,60000);
 }
 
-}
 /* ── BOOTSTRAP ─────────────────────────────────── */
-currentUser = {id:'charles', email:'charles@valemobi', name:'Charles', role:'user'};
+currentUser={id:'charles',email:'charles@valemobi',name:'Charles',role:'user'};
 initApp();
 </script>
 </body>
