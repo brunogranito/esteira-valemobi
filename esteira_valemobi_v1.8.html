@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Esteira Valemobi — RV · v1.8</title>
+<title>Esteira Valemobi — RV · v1.7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
@@ -612,23 +612,54 @@ body.light .paci-name{color:#1e293b}
 </div>
 
 <!-- APP -->
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">⚡</div>
+    <div class="login-title">Esteira Valemobi</div>
+    <div class="login-sub">Plataforma de Gestão de Projetos — RV</div>
+    <div id="loginForm">
+      <label class="login-lbl">E-mail</label>
+      <input class="login-inp" id="loginEmail" type="email" placeholder="seu@valemobi.com.br"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <label class="login-lbl">Senha</label>
+      <input class="login-inp" id="loginPass" type="password" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">Entrar</button>
+      <div class="login-err" id="loginErr"></div>
+      <div class="login-toggle">Não tem conta? <span onclick="showRegister()">Criar conta</span></div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <label class="login-lbl">Nome completo</label>
+      <input class="login-inp" id="regName" placeholder="Seu nome">
+      <label class="login-lbl">E-mail</label>
+      <input class="login-inp" id="regEmail" type="email" placeholder="seu@valemobi.com.br">
+      <label class="login-lbl">Senha (mín. 6 caracteres)</label>
+      <input class="login-inp" id="regPass" type="password" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="login-btn" onclick="doRegister()">Criar conta</button>
+      <div class="login-err" id="regErr"></div>
+      <div class="login-toggle">Já tem conta? <span onclick="showLogin()">Entrar</span></div>
+    </div>
+  </div>
+</div>
+
 <!-- LEFT SIDEBAR -->
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div id="leftSidebar">
   <div class="sb-top">
     <div class="sb-user">
-      <div class="sb-avatar" id="sbAvatar">C</div>
+      <div class="sb-avatar" id="sbAvatar">?</div>
       <div>
-        <div class="sb-uname" id="sbUname">Charles — RV</div>
-        <div class="sb-urole" id="sbUrole">Analista de Negócios</div>
+        <div class="sb-uname" id="sbUname">Carregando…</div>
+        <div class="sb-urole" id="sbUrole"></div>
       </div>
-      
+      <button class="sb-logout" onclick="doLogout()" title="Sair">⏻</button>
     </div>
   </div>
   <nav class="sb-nav">
     <div class="sb-section">Principal</div>
     <div class="sb-item" onclick="openBriefing();closeSidebar()"><span class="sb-item-icon">☀️</span>Briefing do Dia</div>
-    <div class="sb-item" onclick="openGlobalMap();closeSidebar()"><span class="sb-item-icon">🌐</span>Mapa Geral</div>
     <div class="sb-item" onclick="openAgenda();closeSidebar()"><span class="sb-item-icon">📅</span>Agenda</div>
     <div class="sb-item" onclick="openReportsPanel();closeSidebar()"><span class="sb-item-icon">📊</span>Relatórios</div>
     <div class="sb-section">Integrações</div>
@@ -649,7 +680,7 @@ body.light .paci-name{color:#1e293b}
       <button class="sidebar-toggle" onclick="openSidebar()" title="Menu">☰</button>
       <div>
         <div class="app-title">⚡ Esteira Valemobi — RV</div>
-        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.8</span></div>
+        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.7</span></div>
       </div>
     </div>
     <!-- MULTI-SELECT BAR -->
@@ -717,7 +748,6 @@ body.light .paci-name{color:#1e293b}
       <button class="tab" onclick="sw('jira')">🔗 Jira</button>
       <button class="tab" onclick="sw('mtg')">📝 Reuniões</button>
       <button class="tab" onclick="sw('dep')">🔗 Depend.</button>
-      <button class="tab" onclick="sw('diag')">🗺 Diagrama</button>
     </div>
     <div class="mbody">
       <div id="tInfo"></div>
@@ -726,7 +756,6 @@ body.light .paci-name{color:#1e293b}
       <div id="tJira" style="display:none"></div>
       <div id="tMtg" style="display:none"></div>
       <div id="tDep" style="display:none"></div>
-      <div id="tDiag" style="display:none;padding:4px 0"></div>
     </div>
   </div>
 </div>
@@ -803,17 +832,6 @@ body.light .paci-name{color:#1e293b}
   </div>
 </div>
 
-<!-- GLOBAL MAP PANEL -->
-<div class="panel-overlay" id="globalMapOverlay" style="align-items:stretch;justify-content:stretch" onclick="if(event.target===this)closeGlobalMap()">
-  <div style="width:100%;height:100vh;background:#06080f;display:flex;flex-direction:column">
-    <div class="panel-hd" style="flex-shrink:0">
-      <div><div class="panel-title">🌐 Fluxograma Linear — Esteira Valemobi RV</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Visão linear de todas as demandas por stage</div></div>
-      <button class="close-btn" onclick="closeGlobalMap()">×</button>
-    </div>
-    <div style="flex:1;overflow:auto;padding:14px 18px" id="globalMapBody"></div>
-  </div>
-</div>
 <!-- JIRA PANEL -->
 <div class="panel-overlay" id="jiraOverlay" onclick="if(event.target===this)closeJiraPanel()">
   <div class="side-panel">
@@ -861,22 +879,6 @@ body.light .paci-name{color:#1e293b}
 <div id="toastWrap"></div>
 
 <script>
-/* ── SUPABASE (banco de dados na nuvem) ─────────────── */
-const SB_URL='https://lomoavrvrwgyjbhgjqrd.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbW9hdnJ2cndneWpiaGdqcXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDE4NzcsImV4cCI6MjEwMDgxNzg3N30.N6bhNkJH6cxmsh7LTGM2duxN5MnBRhEeuLy7ABe7skA';
-
-async function sbFetch(path,opts={}){
-  return fetch(`${SB_URL}/rest/v1/${path}`,{
-    ...opts,
-    headers:{
-      'apikey':SB_KEY,
-      'Authorization':'Bearer '+SB_KEY,
-      'Content-Type':'application/json',
-      ...(opts.headers||{}),
-    }
-  });
-}
-
 /* ── CONSTANTS ──────────────────────────────────────── */
 const STAGES=[
   {id:"escopo",    label:"Escopo",                icon:"📋",color:"#10b981"},
@@ -2005,6 +2007,113 @@ setInterval(async()=>{
 },30000);
 
 
+/* ── AUTH & USERS ────────────────────────────────────── */
+let currentUser = null;
+
+async function sbGetUser(email){
+  try{
+    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id,email,name,role,last_login`);
+    const d=await r.json();return d?.[0]||null;
+  }catch(e){return null;}
+}
+async function sbCreateUser(email,name,pwHash){
+  try{
+    const r=await sbFetch('app_users',{method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify({email,name,password_hash:pwHash,role:'user'})});
+    const d=await r.json();return Array.isArray(d)?d[0]:d;
+  }catch(e){return null;}
+}
+async function sbUpdateLastLogin(id){
+  try{await sbFetch(`app_users?id=eq.${id}`,{method:'PATCH',
+    body:JSON.stringify({last_login:new Date().toISOString()})});}catch(e){}
+}
+
+// Simple hash (SHA-256 via SubtleCrypto)
+async function hashPw(pw){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function showLogin(){
+  document.getElementById('loginForm').style.display='block';
+  document.getElementById('registerForm').style.display='none';
+  document.getElementById('loginErr').textContent='';
+}
+function showRegister(){
+  document.getElementById('loginForm').style.display='none';
+  document.getElementById('registerForm').style.display='block';
+  document.getElementById('regErr').textContent='';
+}
+
+async function doLogin(){
+  const email=(document.getElementById('loginEmail')?.value||'').trim().toLowerCase();
+  const pass=document.getElementById('loginPass')?.value||'';
+  const errEl=document.getElementById('loginErr');
+  if(!email||!pass){errEl.textContent='Preencha e-mail e senha.';return;}
+  errEl.textContent='Verificando…';
+  const user=await sbGetUser(email);
+  if(!user){errEl.textContent='E-mail não encontrado.';return;}
+  const hash=await hashPw(pass);
+  if(hash!==user.password_hash){errEl.textContent='Senha incorreta.';return;}
+  currentUser=user;
+  lsSet('session',{id:user.id,email:user.email,name:user.name,role:user.role});
+  sbUpdateLastLogin(user.id);
+  loginSuccess();
+}
+
+async function doRegister(){
+  const name=(document.getElementById('regName')?.value||'').trim();
+  const email=(document.getElementById('regEmail')?.value||'').trim().toLowerCase();
+  const pass=document.getElementById('regPass')?.value||'';
+  const errEl=document.getElementById('regErr');
+  if(!name||!email||!pass){errEl.textContent='Preencha todos os campos.';return;}
+  if(pass.length<6){errEl.textContent='Senha deve ter ao menos 6 caracteres.';return;}
+  errEl.textContent='Criando conta…';
+  const existing=await sbGetUser(email);
+  if(existing){errEl.textContent='E-mail já cadastrado.';return;}
+  const hash=await hashPw(pass);
+  const user=await sbCreateUser(email,name,hash);
+  if(!user){errEl.textContent='Erro ao criar conta. Tente novamente.';return;}
+  currentUser={...user,name,email,role:'user'};
+  lsSet('session',{id:user.id||'new',email,name,role:'user'});
+  logActivity('Conta criada','Novo usuário registrado');
+  loginSuccess();
+}
+
+function loginSuccess(){
+  document.getElementById('loginScreen').style.display='none';
+  // Update sidebar user info
+  const u=currentUser;
+  const avatar=document.getElementById('sbAvatar');
+  const uname=document.getElementById('sbUname');
+  const urole=document.getElementById('sbUrole');
+  if(avatar) avatar.textContent=(u.name||'?')[0].toUpperCase();
+  if(uname) uname.textContent=u.name||u.email;
+  if(urole) urole.textContent=u.role==='admin'?'Administrador':'Usuário · RV';
+  initApp();
+}
+
+function doLogout(){
+  if(!confirm('Sair da plataforma?'))return;
+  currentUser=null;
+  lsSet('session',null);
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+  showLogin();
+}
+
+function checkSession(){
+  const sess=lsGet('session');
+  if(sess?.id){
+    currentUser=sess;
+    loginSuccess();
+    return true;
+  }
+  return false;
+}
+
 /* ── SIDEBAR ─────────────────────────────────────────── */
 function openSidebar(){
   document.getElementById('leftSidebar').classList.add('open');
@@ -2816,293 +2925,6 @@ function checkReminders(){
 }
 
 
-/* ── DIAGRAMA — MAPA MENTAL ─────────────────────────── */
-function truncSvg(str,max){return str&&str.length>max?str.substring(0,max)+'…':(str||'')}
-
-function extractDiagramPeople(p){
-  const m=new Map();
-  if(p.owner) m.set(p.owner.trim(),{name:p.owner.trim(),role:'Owner 📌'});
-  if(p.qa)    m.set(p.qa.trim(),{name:p.qa.trim(),role:'QA ✓'});
-  const text=(p.notes||'')+ ' '+(p.desc||'');
-  [...text.matchAll(/@([\w\sÀ-ú]{2,28}?)(?=[\s,;.\n@]|$)/g)].forEach(mt=>{
-    const n=mt[1].trim();if(n&&!m.has(n))m.set(n,{name:n,role:'Mencionado @'});
-  });
-  (p.meetings||[]).forEach(mt=>{
-    (mt.participants||'').split(',').map(n=>n.trim()).filter(Boolean).forEach(n=>{
-      if(!m.has(n))m.set(n,{name:n,role:'Participante 📝'});
-    });
-  });
-  return [...m.values()].slice(0,7);
-}
-
-function renderDiagram(){
-  const p=getP(selId);if(!p)return;
-  const el=document.getElementById('tDiag');
-  const stageIdx=STAGES.findIndex(s=>s.id===p.stage);
-  const st=STAGES[stageIdx]||{color:'#06b6d4',label:p.stage,icon:''};
-
-  // Tasks current stage
-  const clS=CL[p.stage]||[];
-  const tasks=[...clS.flatMap(s=>s.t),...((p.customTasks||{})[p.stage]||[])].filter(t=>!(p.dis||{})[t.id||t.tid]).slice(0,8);
-
-  // People
-  const people=extractDiagramPeople(p);
-
-  // Docs
-  const docs=[
-    ...(p.links||[]).map(l=>({icon:'🔗',name:l.n||l.u,sub:'',col:'#38bdf8'})),
-    ...(p.meetings||[]).slice(0,3).map(mt=>({icon:'📝',name:'Ata '+new Date(mt.date+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}),sub:mt.participants?mt.participants.split(',')[0].trim():'',col:'#34d399'})),
-  ].slice(0,7);
-
-  const blockers=(p.blockers||[]).slice(0,5);
-
-  // Canvas
-  const W=880;
-  const leftItems=Math.max(people.length,1);
-  const rightItems=Math.max(tasks.length,1);
-  const botLeft=Math.max(docs.length,1);
-  const botRight=Math.max(blockers.length,1);
-  const topH=Math.max(leftItems,rightItems)*38+200;
-  const botH=Math.max(botLeft,botRight)*36+80;
-  const H=Math.max(topH+botH, 520);
-  const CX=W/2, CY=Math.round(H*0.38);
-
-  // Node builders
-  function rnode(x,y,w,h,fill,stroke,glow=false){
-    return `<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${glow?2:1.5}"${glow?' filter="url(#glow)"':''}/>`;
-  }
-  function gnode(x,y,label,col,w=125,h=28){
-    return rnode(x,y,w,h,col+'18',col)+
-      `<text x="${x}" y="${y+4}" text-anchor="middle" fill="${col}" font-size="10" font-weight="700">${label}</text>`;
-  }
-  function lnode(x,y,icon,label,sub,col,w=138,h=30){
-    return rnode(x,y,w,h,'#0d1a2d',col+'50')+
-      `<text x="${x-w/2+9}" y="${y+(sub?-2:3)}" fill="${col}" font-size="12">${icon}</text>`+
-      `<text x="${x-w/2+26}" y="${y+(sub?-2:4)}" fill="#cbd5e1" font-size="9" font-weight="600">${truncSvg(label,17)}</text>`+
-      (sub?`<text x="${x-w/2+26}" y="${y+9}" fill="#475569" font-size="8">${truncSvg(sub,20)}</text>`:'');
-  }
-  function bez(x1,y1,x2,y2,col){
-    const mx=(x1+x2)/2;
-    return `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
-  }
-  function lin(x1,y1,x2,y2,col){
-    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1" opacity="0.4"/>`;
-  }
-
-  let s=`<svg id="mindMapSvg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-  <defs>
-    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <radialGradient id="bggrad" cx="50%" cy="40%"><stop offset="0%" stop-color="#0f2040"/><stop offset="100%" stop-color="#080e1a"/></radialGradient>
-  </defs>
-  <rect width="${W}" height="${H}" fill="url(#bggrad)" rx="12"/>`;
-
-  // ── STAGE TRACK ─────────────────────────────────────
-  const sw=W-100, sx0=50, sy=38;
-  s+=`<text x="${W/2}" y="16" fill="#334155" font-size="8" text-anchor="middle" font-weight="700" letter-spacing="1.5">PIPELINE DE STAGES</text>`;
-  STAGES.forEach((sg,i)=>{
-    const x=sx0+(i/(STAGES.length-1))*sw;
-    const isPast=i<stageIdx,isCur=i===stageIdx;
-    const col=isCur?sg.color:isPast?'#10b981':'#1e293b';
-    if(i>0){const px=sx0+((i-1)/(STAGES.length-1))*sw;s+=`<line x1="${px}" y1="${sy}" x2="${x}" y2="${sy}" stroke="${i<=stageIdx?'#1a4a35':'#1a2035'}" stroke-width="2"/>`;}
-    s+=`<circle cx="${x}" cy="${sy}" r="${isCur?10:6}" fill="${isCur?sg.color+'30':'#0c1829'}" stroke="${col}" stroke-width="${isCur?2.5:1.5}"${isCur?' filter="url(#glow)"':''}/>`;
-    if(isPast)s+=`<text x="${x}" y="${sy+4}" text-anchor="middle" fill="#10b981" font-size="8">✓</text>`;
-    if(isCur)s+=`<circle cx="${x}" cy="${sy}" r="3.5" fill="${sg.color}"/>`;
-    const lb=sg.label.replace('Ag. Aprovação de Horas','Ag.Horas').replace('Descob./Refin.','Descob.').replace('Homologação','Homolog.').replace('Pós-RDM','Pós-RDM');
-    s+=`<text x="${x}" y="${sy+18}" text-anchor="middle" fill="${col}" font-size="7.5" font-weight="${isCur?700:400}">${lb}</text>`;
-  });
-
-  // ── CENTER NODE ──────────────────────────────────────
-  const cnW=190,cnH=72,cnX=CX-cnW/2,cnY=CY-cnH/2;
-  s+=rnode(CX,CY,cnW,cnH,'#0d2040',st.color,true);
-  s+=`<text x="${CX}" y="${cnY+18}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${truncSvg(p.name,24)}</text>`;
-  s+=`<text x="${CX}" y="${cnY+31}" text-anchor="middle" fill="#64748b" font-size="9">${p.code}</text>`;
-  const pbW=cnW-24,pbX=cnX+12,pbY=cnY+40;
-  s+=`<rect x="${pbX}" y="${pbY}" width="${pbW}" height="5" rx="3" fill="#1e293b"/>`;
-  s+=`<rect x="${pbX}" y="${pbY}" width="${Math.round(pbW*p.progress/100)}" height="5" rx="3" fill="${st.color}"/>`;
-  s+=`<text x="${CX}" y="${cnY+62}" text-anchor="middle" fill="${st.color}" font-size="9" font-weight="600">${p.progress}% · ${st.label}</text>`;
-
-  // ── PEOPLE branch (left) ─────────────────────────────
-  const pCol='#a78bfa';
-  const pGX=Math.round(CX*0.42), pGY=CY-20;
-  const pStartY=CY-((people.length-1)/2)*38;
-  s+=bez(cnX,CY,pGX+62,pGY,pCol);
-  s+=gnode(pGX,pGY,'👥 Pessoas',pCol);
-  people.forEach((prs,i)=>{
-    const ly=pStartY+i*38;
-    const lx=74;
-    s+=lin(pGX-62,pGY,lx+69,ly,pCol);
-    s+=lnode(lx,ly,'👤',prs.name,prs.role,pCol,140,30);
-  });
-  if(!people.length)s+=`<text x="${pGX}" y="${pGY+24}" text-anchor="middle" fill="#334155" font-size="9">Nenhuma pessoa detectada</text>`;
-
-  // ── TASKS branch (right) ─────────────────────────────
-  const tCol='#34d399';
-  const tGX=Math.round(CX+CX*0.58), tGY=CY-20;
-  const tStartY=CY-((Math.min(tasks.length,8)-1)/2)*36;
-  s+=bez(cnX+cnW,CY,tGX-62,tGY,tCol);
-  s+=gnode(tGX,tGY,'☑️ Tarefas',tCol);
-  tasks.forEach((t,i)=>{
-    const tid=t.id||t.tid;
-    const done=(p.checks||{})[tid];
-    const hasDue=(p.taskDates||{})[tid];
-    const lCol=done?'#10b981':hasDue?'#fbbf24':'#475569';
-    const ico=done?'✅':hasDue?'🔔':'⬜';
-    const txt=(p.taskText||{})[tid]||t.tx||'Tarefa';
-    const ly=tStartY+i*36;
-    const lx=W-74;
-    s+=lin(tGX+62,tGY,lx-69,ly,tCol);
-    s+=lnode(lx,ly,ico,txt,done?'Concluída':'Pendente',lCol,140,30);
-  });
-  if(!tasks.length)s+=`<text x="${tGX}" y="${tGY+24}" text-anchor="middle" fill="#334155" font-size="9">Sem tarefas no stage</text>`;
-
-  // ── DOCS branch (bottom-left) ────────────────────────
-  const dCol='#fbbf24';
-  const dGX=Math.round(CX*0.42), dGY=CY+110;
-  const dStartY=dGY+38;
-  s+=bez(cnX+30,cnY+cnH,dGX+62,dGY-14,dCol);
-  s+=gnode(dGX,dGY,'📄 Docs & Links',dCol,135);
-  docs.forEach((d,i)=>{
-    const ly=dStartY+i*36;
-    const lx=74;
-    s+=lin(dGX-67,dGY+14,lx+69,ly,dCol);
-    s+=lnode(lx,ly,d.icon,d.name,d.sub,d.col||dCol,140,30);
-  });
-  if(!docs.length)s+=`<text x="${dGX}" y="${dGY+32}" text-anchor="middle" fill="#334155" font-size="9">Sem documentos</text>`;
-
-  // ── BLOCKERS branch (bottom-right) ───────────────────
-  const bCol='#f87171';
-  const bGX=Math.round(CX+CX*0.58), bGY=CY+110;
-  const bStartY=bGY+38;
-  s+=bez(cnX+cnW-30,cnY+cnH,bGX-62,bGY-14,bCol);
-  s+=gnode(bGX,bGY,'🚧 Bloqueadores',bCol,140);
-  if(!blockers.length){
-    s+=`<text x="${bGX}" y="${bGY+30}" text-anchor="middle" fill="#10b981" font-size="9" font-weight="600">✅ Sem bloqueadores</text>`;
-  } else {
-    blockers.forEach((b,i)=>{
-      const ly=bStartY+i*36;
-      const lx=W-74;
-      s+=lin(bGX+70,bGY+14,lx-69,ly,bCol);
-      s+=lnode(lx,ly,'🚧',b,'',bCol,140,28);
-    });
-  }
-
-  s+=`</svg>`;
-
-  el.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
-      <div style="font-size:11px;color:#64748b">Mapa mental · Stage atual: <strong style="color:${st.color}">${st.icon} ${st.label}</strong></div>
-      <div style="display:flex;gap:6px">
-        <button class="jira-btn-sec" style="font-size:10px" onclick="exportDiagramPDF()">⬇ PDF</button>
-        <button class="jira-btn-sec" style="font-size:10px" onclick="exportDiagramSVG()">⬇ SVG</button>
-      </div>
-    </div>
-    <div id="diagramSvgWrap" style="background:#080e1a;border-radius:12px;border:1px solid rgba(71,85,105,.2);overflow:hidden">${s}</div>`;
-}
-
-function exportDiagramPDF(){
-  const svgEl=document.getElementById('mindMapSvg');
-  if(!svgEl){showToast('Aviso','Abra a aba Diagrama primeiro.');return;}
-  const p=getP(selId);
-  const w=window.open('','_blank','width=1050,height=720');
-  if(!w){showToast('Bloqueio de pop-up','Permita pop-ups neste site.');return;}
-  const svgStr=svgEl.outerHTML;
-  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Diagrama — ${p?.name||''}</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#080e1a;display:flex;flex-direction:column;align-items:center;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-    .hdr{margin-bottom:14px;text-align:center}
-    .hdr h2{color:#e2e8f0;font-size:16px;font-weight:700;margin-bottom:4px}
-    .hdr p{color:#64748b;font-size:11px}
-    svg{max-width:980px;width:100%;height:auto}
-    .footer{margin-top:14px;font-size:10px;color:#334155}
-    @media print{body{background:#080e1a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      @page{margin:12mm;size:A4 landscape}}
-  </style></head><body>
-  <div class="hdr"><h2>⚡ ${p?.name||''}</h2><p>${p?.code||''} · Mapa Mental · ${new Date().toLocaleDateString('pt-BR')}</p></div>
-  ${svgStr}
-  <div class="footer">Esteira Valemobi RV · v1.8</div>
-  <script>window.onload=()=>{setTimeout(()=>window.print(),500);}<\/script>
-  </body></html>`);
-  w.document.close();
-}
-
-function exportDiagramSVG(){
-  const svgEl=document.getElementById('mindMapSvg');
-  if(!svgEl)return;
-  const p=getP(selId);
-  const blob=new Blob(['<?xml version="1.0"?>'+svgEl.outerHTML],{type:'image/svg+xml;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`mapa_${(p?.code||'card').replace(/[/\\ ]/g,'_')}.svg`;
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-}
-
-
-/* ── FLUXOGRAMA LINEAR — MAPA GERAL ─────────────────── */
-function openGlobalMap(){
-  document.getElementById('globalMapOverlay').classList.add('open');
-  renderGlobalMap();
-}
-function closeGlobalMap(){
-  document.getElementById('globalMapOverlay').classList.remove('open');
-}
-
-function renderGlobalMap(){
-  const el=document.getElementById('globalMapBody');
-  if(!el)return;
-
-  const active=projects.filter(p=>!p.archived);
-  const urgent=active.filter(p=>p.priority==='urgent').length;
-  const blk=active.filter(p=>p.blockers&&p.blockers.length>0).length;
-  const concl=projects.filter(p=>p.progress>=100).length;
-  const avgProg=active.length?Math.round(active.reduce((s,p)=>s+p.progress,0)/active.length):0;
-
-  // ── Helpers ─────────────────────────────────────────
-  function tl(str,max){return str&&str.length>max?str.substring(0,max)+'…':(str||'');}
-  function sl(lbl){
-    return lbl.replace('Ag. Aprovação de Horas','Ag. Horas')
-              .replace('Descob./Refin.','Descob./Refin.')
-              .replace('Homologação','Homolog.')
-              .replace('Pós-RDM','Pós-RDM');
-  }
-  // daysInStage: defined above
-
-function exportGlobalPDF(){
-  const svgEl=document.getElementById('globalMapSvg');
-  if(!svgEl){showToast('Aviso','Abra o Mapa Geral primeiro.');return;}
-  const w=window.open('','_blank','width=1300,height=800');
-  if(!w){showToast('Bloqueio','Permita pop-ups.');return;}
-  const dt=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
-  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Fluxograma — Esteira Valemobi RV</title>
-  <style>*{margin:0;padding:0;box-sizing:border-box}
-  body{background:#06080f;padding:16px 20px;font-family:-apple-system,sans-serif}
-  p{color:#64748b;font-size:10px;text-align:center;margin:8px 0}
-  svg{width:100%;height:auto}
-  @media print{body{background:#06080f!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  @page{margin:5mm;size:A3 landscape}}</style></head><body>
-  <p>Fluxograma Geral · Esteira Valemobi RV · ${dt}</p>
-  ${svgEl.outerHTML}
-  <p>brunogranito.github.io/esteira-valemobi/ · Confidencial</p>
-  <script>window.onload=()=>{setTimeout(()=>window.print(),600);}<\/script>
-  </body></html>`);
-  w.document.close();
-}
-
-function exportGlobalSVG(){
-  const svgEl=document.getElementById('globalMapSvg');
-  if(!svgEl)return;
-  const blob=new Blob(['<?xml version="1.0"?>'+svgEl.outerHTML],{type:'image/svg+xml;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='fluxograma_esteira_rv.svg';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-}
-
-
 const INIT=[
   {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Charles",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
    desc:"Feature de exibição do Valor Investido (preço médio) para ativos de RV em custódia. Cobre 3 cenários: (1) Ativo de IPO — preço de custo via CRCA, preço de mercado via backoffice; (2) Ativo Lockup sem cotação — preço manual do backoffice; (3) Ativo já negociado B3 — liquidadas usam accepted booking, não-liquidadas usam bucket. Inclui reprocessamento diário de posições.",
@@ -3188,7 +3010,9 @@ const PFX="vl_";
 function lsGet(k){try{const v=localStorage.getItem(PFX+k);return v?JSON.parse(v):null;}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(e){}}
 
-/* ── SUPABASE: definido no topo do script ── */
+/* ── SUPABASE (banco de dados na nuvem) ─────────────── */
+const SB_URL='https://lomoavrvrwgyjbhgjqrd.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbW9hdnJ2cndneWpiaGdqcXJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDE4NzcsImV4cCI6MjEwMDgxNzg3N30.N6bhNkJH6cxmsh7LTGM2duxN5MnBRhEeuLy7ABe7skA';
 
 // Chaves que ficam APENAS no localStorage (dados sensíveis)
 const LS_ONLY=['apikey','jira'];
@@ -3203,7 +3027,17 @@ function setSbBadge(status,msg){
   if(dot) dot.className='sb-dot'+(status==='syncing'?' pulse':'');
 }
 
-// sbFetch: definido no topo
+async function sbFetch(path,opts={}){
+  return fetch(`${SB_URL}/rest/v1/${path}`,{
+    ...opts,
+    headers:{
+      'apikey':SB_KEY,
+      'Authorization':'Bearer '+SB_KEY,
+      'Content-Type':'application/json',
+      ...(opts.headers||{}),
+    }
+  });
+}
 
 async function sbGet(id){
   try{
@@ -3613,13 +3447,13 @@ function moveStage(sid){
 
 function sw(t){
   curTab=t;
-  const tabs=["info","check","ia","jira","mtg","dep","diag"];
+  const tabs=["info","check","ia","jira","mtg","dep"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===t));
   renderTab();
 }
 function renderTab(){
-  ["tInfo","tCheck","tIa","tJira","tMtg","tDep","tDiag"].forEach(id=>document.getElementById(id).style.display="none");
-  const map={info:"tInfo",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep",diag:"tDiag"};
+  ["tInfo","tCheck","tIa","tJira","tMtg","tDep"].forEach(id=>document.getElementById(id).style.display="none");
+  const map={info:"tInfo",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep"};
   document.getElementById(map[curTab]||"tInfo").style.display="block";
   if(curTab==="info")renderInfo();
   if(curTab==="check")renderCheck();
@@ -3627,7 +3461,6 @@ function renderTab(){
   if(curTab==="jira")renderJiraModal();
   if(curTab==="mtg")renderMeetings();
   if(curTab==="dep")renderDeps();
-  if(curTab==="diag")renderDiagram();
 }
 
 /* ── INFO TAB ───────────────────────────────────────── */
@@ -4533,48 +4366,69 @@ async function sendAI(){
 async function initApp(){
   setSbBadge('syncing','Conectando à nuvem…');
 
-  // Timeout 5s — evita travar infinitamente se Supabase não responder
-  const T=(p)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),5000))]);
-
   try{
-    const [sbProjects,sbOrders,sbJiraCfg]=await T(Promise.all([
-      sbGet('projects'),sbGet('orders'),sbGet('jira_cfg'),
-    ]));
+    // 1. Tentar carregar projetos do Supabase
+    const [sbProjects, sbOrders, sbJiraCfg] = await Promise.all([
+      sbGet('projects'),
+      sbGet('orders'),
+      sbGet('jira_cfg'),  // config sem token (email, domain, useProxy)
+    ]);
+
+    // Merge Supabase jira_cfg with localStorage token
+    if(sbJiraCfg){
+      const localJira=lsGet('jira')||{};
+      if(!localJira.token&&jiraConfig.token){
+        // Já temos token na variável, só atualiza email/domain
+      }
+      jiraConfig={
+        email:localJira.email||sbJiraCfg.email||'',
+        token:localJira.token||jiraConfig.token||'',
+        domain:localJira.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
+        useProxy:localJira.useProxy!==undefined?localJira.useProxy:sbJiraCfg.useProxy!==false,
+      };
+      if(jiraConfig.email) lsSet('jira',jiraConfig);
+    }
 
     if(sbProjects?.length){
-      projects=sbProjects;lsSet('projects',projects);
+      // Supabase tem dados — usar esses (mais recentes)
+      projects=sbProjects;
+      lsSet('projects',projects); // sincronizar localStorage
     } else {
+      // Supabase vazio — carregar do localStorage (migração)
       loadProjectsLocal();
-      if(projects.length) sbSet('projects',projects).catch(()=>{});
+      if(projects.length>0){
+        // Migrar localStorage → Supabase
+        setSbBadge('syncing','Migrando dados para a nuvem…');
+        await sbSet('projects',projects);
+      }
     }
+
     if(sbOrders&&Object.keys(sbOrders).length){
-      stageOrders=sbOrders;lsSet('orders',stageOrders);
+      stageOrders=sbOrders;
+      lsSet('orders',stageOrders);
     } else {
       loadOrdersLocal();
-      if(Object.keys(stageOrders).length) sbSet('orders',stageOrders).catch(()=>{});
+      if(Object.keys(stageOrders).length>0) await sbSet('orders',stageOrders);
     }
-    if(sbJiraCfg){
-      const lj=lsGet('jira')||{};
-      jiraConfig={email:lj.email||sbJiraCfg.email||'',token:lj.token||jiraConfig.token||'',
-        domain:lj.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
-        useProxy:lj.useProxy!==undefined?lj.useProxy:sbJiraCfg.useProxy!==false};
-      if(jiraConfig.email)lsSet('jira',jiraConfig);
-    }
+
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     setSbBadge('synced',`☁ Sincronizado às ${now}`);
 
   }catch(e){
-    loadProjectsLocal();loadOrdersLocal();
+    // Supabase indisponível — usar localStorage
+    loadProjectsLocal();
+    loadOrdersLocal();
     setSbBadge('offline','⚠ Offline — dados locais');
-    console.warn('Supabase:',e.message);
+    console.warn('Supabase indisponível:',e);
   }
 
-  // Sempre renderizar (independente do Supabase)
+  // Auto-calcular progresso de todos os projetos
   projects=projects.map(p=>{
     if(p.archived)return p;
     try{const pct=autoProgress(p);return pct!==p.progress?{...p,progress:pct}:p;}
     catch(e){return p;}
   });
+
   loadMenuData();
   renderBoard();
   renderStats();
@@ -4583,10 +4437,10 @@ async function initApp(){
   setInterval(checkReminders,60000);
 }
 
+/* ── BOOTSTRAP ── check session or show login ─── */
+if(!checkSession()){
+  document.getElementById('loginScreen').style.display='flex';
 }
-/* ── BOOTSTRAP ─────────────────────────────────── */
-currentUser={id:'charles',email:'charles@valemobi',name:'Charles',role:'user'};
-initApp();
 </script>
 </body>
 </html>
