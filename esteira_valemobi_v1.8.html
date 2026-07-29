@@ -3511,7 +3511,10 @@ function renderInfo(){
     </span>`).join("");
   }
   h+=`<button class="link-add-btn" onclick="openLinkModal()">+ Adicionar</button></div>`;
-  h+=`<button class="arch-btn" onclick="confirmArchive('${p.id}')">📦 Arquivar esta demanda</button>`;
+  h+=`<div style="display:flex;gap:8px;margin-top:14px">
+    <button class="arch-btn" style="margin-top:0;flex:1" onclick="confirmArchive('${p.id}')">📦 Arquivar</button>
+    <button class="arch-btn" style="margin-top:0;flex:1;color:#f87171;border-color:rgba(239,68,68,.3)" onclick="confirmDelete('${p.id}')">🗑 Excluir</button>
+  </div>`;
   document.getElementById("tInfo").innerHTML=h;
 }
 function editBlk(){
@@ -3536,6 +3539,17 @@ function confirmArchive(id){
   const p=getP(id);if(!p)return;
   if(confirm(`Arquivar "${p.name}"?\n\nEla sairá do board mas pode ser restaurada a qualquer momento pelo botão 📦 no topo.`)){
     archiveProject(id);
+  }
+}
+function confirmDelete(id){
+  const p=getP(id);if(!p)return;
+  if(confirm(`Excluir permanentemente "${p.name}"?\n\n⚠️ Esta ação não pode ser desfeita.`)){
+    projects=projects.filter(x=>x.id!==id);
+    removeFromOrder(p.stage,id);
+    saveProjects();
+    closeModal();
+    renderBoard();renderStats();
+    showToast('🗑 Excluído',`"${p.name}" removido permanentemente.`);
   }
 }
 
