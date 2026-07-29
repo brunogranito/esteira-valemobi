@@ -1461,6 +1461,9 @@ async function fetchJiraPreview(){
 
   if(!issue){prev.classList.remove('show');return;}
 
+  // Cache do issue para o doImportJira (evita segunda chamada)
+  _lastJiraPreview=issue;
+
   const f=issue.fields;
   const statusName=f?.status?.name||'?';
   const statusCat=f?.status?.statusCategory?.key||'TODO';
@@ -1497,10 +1500,27 @@ async function fetchJiraPreview(){
   `;
 }
 
+// Cache do último issue buscado no preview
+let _lastJiraPreview = null;
+
 async function doImportJira(key,summary){
   const stage=document.getElementById('jImportStage')?.value||'escopo';
-  const issue=await jiraFetch(`issue/${key}?fields=summary,status,priority,assignee,description,updated`);
-  if(!issue){return;}
+
+  // Usar dados já buscados no preview (sem segunda chamada ao Jira)
+  let issue=_lastJiraPreview&&_lastJiraPreview.key===key?_lastJiraPreview:null;
+
+  // Só busca novamente se não tiver o cache
+  if(!issue){
+    const btn=document.querySelector('.jira-btn[onclick*="doImportJira"]');
+    if(btn){btn.textContent='⏳ Importando…';btn.disabled=true;}
+    issue=await jiraFetch(`issue/${key}?fields=summary,status,priority,assignee,description,updated`);
+    if(!issue){
+      showToast('❌ Erro ao importar','Não foi possível buscar o ticket. Tente novamente.');
+      if(btn){btn.textContent='📥 Importar como card';btn.disabled=false;}
+      return;
+    }
+  }
+
   const card=jiraIssueToCard(issue);
   card.stage=stage;
   projects.push(card);
@@ -1508,7 +1528,8 @@ async function doImportJira(key,summary){
   refreshProgress(card.id);
   renderBoard();renderStats();
   logActivity('Card importado do Jira',`${key} — ${summary}`,card.id,summary);
-  showToast('✅ Importado!',`"${summary}" adicionado à esteira como ${STAGES.find(s=>s.id===stage)?.label||stage}.`);
+  showToast('✅ Importado!',`"${summary||key}" adicionado como ${STAGES.find(s=>s.id===stage)?.label||stage}.`);
+  _lastJiraPreview=null;
   closeJiraPanel();
 }
 
