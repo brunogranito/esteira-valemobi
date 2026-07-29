@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Esteira Valemobi — RV · v1.7</title>
+<title>Esteira Valemobi — RV · v1.8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
@@ -627,6 +627,14 @@ body.light .paci-name{color:#1e293b}
         onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" onclick="doLogin()">Entrar</button>
       <div class="login-err" id="loginErr"></div>
+      <div id="localPreviewBtn" style="display:none;margin-top:14px">
+        <div style="border-top:1px solid rgba(71,85,105,.3);padding-top:14px;text-align:center">
+          <div style="font-size:10px;color:#475569;margin-bottom:8px">⚠️ Arquivo aberto localmente — Supabase bloqueado pelo browser</div>
+          <button onclick="previewLogin()" style="width:100%;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.35);color:#fbbf24;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+            👁 Abrir em modo visualização (sem login)
+          </button>
+        </div>
+      </div>
       <div class="login-toggle">Não tem conta? <span onclick="showRegister()">Criar conta</span></div>
     </div>
     <div id="registerForm" style="display:none">
@@ -660,6 +668,7 @@ body.light .paci-name{color:#1e293b}
   <nav class="sb-nav">
     <div class="sb-section">Principal</div>
     <div class="sb-item" onclick="openBriefing();closeSidebar()"><span class="sb-item-icon">☀️</span>Briefing do Dia</div>
+    <div class="sb-item" onclick="openGlobalMap();closeSidebar()"><span class="sb-item-icon">🌐</span>Mapa Geral</div>
     <div class="sb-item" onclick="openAgenda();closeSidebar()"><span class="sb-item-icon">📅</span>Agenda</div>
     <div class="sb-item" onclick="openReportsPanel();closeSidebar()"><span class="sb-item-icon">📊</span>Relatórios</div>
     <div class="sb-section">Integrações</div>
@@ -680,7 +689,7 @@ body.light .paci-name{color:#1e293b}
       <button class="sidebar-toggle" onclick="openSidebar()" title="Menu">☰</button>
       <div>
         <div class="app-title">⚡ Esteira Valemobi — RV</div>
-        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.7</span></div>
+        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.8</span></div>
       </div>
     </div>
     <!-- MULTI-SELECT BAR -->
@@ -748,6 +757,7 @@ body.light .paci-name{color:#1e293b}
       <button class="tab" onclick="sw('jira')">🔗 Jira</button>
       <button class="tab" onclick="sw('mtg')">📝 Reuniões</button>
       <button class="tab" onclick="sw('dep')">🔗 Depend.</button>
+      <button class="tab" onclick="sw('diag')">🗺 Diagrama</button>
     </div>
     <div class="mbody">
       <div id="tInfo"></div>
@@ -756,6 +766,7 @@ body.light .paci-name{color:#1e293b}
       <div id="tJira" style="display:none"></div>
       <div id="tMtg" style="display:none"></div>
       <div id="tDep" style="display:none"></div>
+      <div id="tDiag" style="display:none;padding:4px 0"></div>
     </div>
   </div>
 </div>
@@ -832,6 +843,17 @@ body.light .paci-name{color:#1e293b}
   </div>
 </div>
 
+<!-- GLOBAL MAP PANEL -->
+<div class="panel-overlay" id="globalMapOverlay" style="align-items:stretch;justify-content:stretch" onclick="if(event.target===this)closeGlobalMap()">
+  <div style="width:100%;height:100vh;background:#06080f;display:flex;flex-direction:column">
+    <div class="panel-hd" style="flex-shrink:0">
+      <div><div class="panel-title">🌐 Fluxograma Linear — Esteira Valemobi RV</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Visão linear de todas as demandas por stage</div></div>
+      <button class="close-btn" onclick="closeGlobalMap()">×</button>
+    </div>
+    <div style="flex:1;overflow:auto;padding:14px 18px" id="globalMapBody"></div>
+  </div>
+</div>
 <!-- JIRA PANEL -->
 <div class="panel-overlay" id="jiraOverlay" onclick="if(event.target===this)closeJiraPanel()">
   <div class="side-panel">
@@ -2104,7 +2126,18 @@ function doLogout(){
   showLogin();
 }
 
+function previewLogin(){
+  // Modo visualização local — sem Supabase
+  currentUser={id:'preview_local',email:'preview@local',name:'Preview Local',role:'user'};
+  loginSuccess();
+}
+
 function checkSession(){
+  // Se aberto como arquivo local, mostrar botão de preview
+  if(window.location.protocol==='file:'){
+    const btn=document.getElementById('localPreviewBtn');
+    if(btn) btn.style.display='block';
+  }
   const sess=lsGet('session');
   if(sess?.id){
     currentUser=sess;
@@ -2925,6 +2958,293 @@ function checkReminders(){
 }
 
 
+/* ── DIAGRAMA — MAPA MENTAL ─────────────────────────── */
+function truncSvg(str,max){return str&&str.length>max?str.substring(0,max)+'…':(str||'')}
+
+function extractDiagramPeople(p){
+  const m=new Map();
+  if(p.owner) m.set(p.owner.trim(),{name:p.owner.trim(),role:'Owner 📌'});
+  if(p.qa)    m.set(p.qa.trim(),{name:p.qa.trim(),role:'QA ✓'});
+  const text=(p.notes||'')+ ' '+(p.desc||'');
+  [...text.matchAll(/@([\w\sÀ-ú]{2,28}?)(?=[\s,;.\n@]|$)/g)].forEach(mt=>{
+    const n=mt[1].trim();if(n&&!m.has(n))m.set(n,{name:n,role:'Mencionado @'});
+  });
+  (p.meetings||[]).forEach(mt=>{
+    (mt.participants||'').split(',').map(n=>n.trim()).filter(Boolean).forEach(n=>{
+      if(!m.has(n))m.set(n,{name:n,role:'Participante 📝'});
+    });
+  });
+  return [...m.values()].slice(0,7);
+}
+
+function renderDiagram(){
+  const p=getP(selId);if(!p)return;
+  const el=document.getElementById('tDiag');
+  const stageIdx=STAGES.findIndex(s=>s.id===p.stage);
+  const st=STAGES[stageIdx]||{color:'#06b6d4',label:p.stage,icon:''};
+
+  // Tasks current stage
+  const clS=CL[p.stage]||[];
+  const tasks=[...clS.flatMap(s=>s.t),...((p.customTasks||{})[p.stage]||[])].filter(t=>!(p.dis||{})[t.id||t.tid]).slice(0,8);
+
+  // People
+  const people=extractDiagramPeople(p);
+
+  // Docs
+  const docs=[
+    ...(p.links||[]).map(l=>({icon:'🔗',name:l.n||l.u,sub:'',col:'#38bdf8'})),
+    ...(p.meetings||[]).slice(0,3).map(mt=>({icon:'📝',name:'Ata '+new Date(mt.date+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}),sub:mt.participants?mt.participants.split(',')[0].trim():'',col:'#34d399'})),
+  ].slice(0,7);
+
+  const blockers=(p.blockers||[]).slice(0,5);
+
+  // Canvas
+  const W=880;
+  const leftItems=Math.max(people.length,1);
+  const rightItems=Math.max(tasks.length,1);
+  const botLeft=Math.max(docs.length,1);
+  const botRight=Math.max(blockers.length,1);
+  const topH=Math.max(leftItems,rightItems)*38+200;
+  const botH=Math.max(botLeft,botRight)*36+80;
+  const H=Math.max(topH+botH, 520);
+  const CX=W/2, CY=Math.round(H*0.38);
+
+  // Node builders
+  function rnode(x,y,w,h,fill,stroke,glow=false){
+    return `<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${glow?2:1.5}"${glow?' filter="url(#glow)"':''}/>`;
+  }
+  function gnode(x,y,label,col,w=125,h=28){
+    return rnode(x,y,w,h,col+'18',col)+
+      `<text x="${x}" y="${y+4}" text-anchor="middle" fill="${col}" font-size="10" font-weight="700">${label}</text>`;
+  }
+  function lnode(x,y,icon,label,sub,col,w=138,h=30){
+    return rnode(x,y,w,h,'#0d1a2d',col+'50')+
+      `<text x="${x-w/2+9}" y="${y+(sub?-2:3)}" fill="${col}" font-size="12">${icon}</text>`+
+      `<text x="${x-w/2+26}" y="${y+(sub?-2:4)}" fill="#cbd5e1" font-size="9" font-weight="600">${truncSvg(label,17)}</text>`+
+      (sub?`<text x="${x-w/2+26}" y="${y+9}" fill="#475569" font-size="8">${truncSvg(sub,20)}</text>`:'');
+  }
+  function bez(x1,y1,x2,y2,col){
+    const mx=(x1+x2)/2;
+    return `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.5"/>`;
+  }
+  function lin(x1,y1,x2,y2,col){
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1" opacity="0.4"/>`;
+  }
+
+  let s=`<svg id="mindMapSvg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="bggrad" cx="50%" cy="40%"><stop offset="0%" stop-color="#0f2040"/><stop offset="100%" stop-color="#080e1a"/></radialGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bggrad)" rx="12"/>`;
+
+  // ── STAGE TRACK ─────────────────────────────────────
+  const sw=W-100, sx0=50, sy=38;
+  s+=`<text x="${W/2}" y="16" fill="#334155" font-size="8" text-anchor="middle" font-weight="700" letter-spacing="1.5">PIPELINE DE STAGES</text>`;
+  STAGES.forEach((sg,i)=>{
+    const x=sx0+(i/(STAGES.length-1))*sw;
+    const isPast=i<stageIdx,isCur=i===stageIdx;
+    const col=isCur?sg.color:isPast?'#10b981':'#1e293b';
+    if(i>0){const px=sx0+((i-1)/(STAGES.length-1))*sw;s+=`<line x1="${px}" y1="${sy}" x2="${x}" y2="${sy}" stroke="${i<=stageIdx?'#1a4a35':'#1a2035'}" stroke-width="2"/>`;}
+    s+=`<circle cx="${x}" cy="${sy}" r="${isCur?10:6}" fill="${isCur?sg.color+'30':'#0c1829'}" stroke="${col}" stroke-width="${isCur?2.5:1.5}"${isCur?' filter="url(#glow)"':''}/>`;
+    if(isPast)s+=`<text x="${x}" y="${sy+4}" text-anchor="middle" fill="#10b981" font-size="8">✓</text>`;
+    if(isCur)s+=`<circle cx="${x}" cy="${sy}" r="3.5" fill="${sg.color}"/>`;
+    const lb=sg.label.replace('Ag. Aprovação de Horas','Ag.Horas').replace('Descob./Refin.','Descob.').replace('Homologação','Homolog.').replace('Pós-RDM','Pós-RDM');
+    s+=`<text x="${x}" y="${sy+18}" text-anchor="middle" fill="${col}" font-size="7.5" font-weight="${isCur?700:400}">${lb}</text>`;
+  });
+
+  // ── CENTER NODE ──────────────────────────────────────
+  const cnW=190,cnH=72,cnX=CX-cnW/2,cnY=CY-cnH/2;
+  s+=rnode(CX,CY,cnW,cnH,'#0d2040',st.color,true);
+  s+=`<text x="${CX}" y="${cnY+18}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${truncSvg(p.name,24)}</text>`;
+  s+=`<text x="${CX}" y="${cnY+31}" text-anchor="middle" fill="#64748b" font-size="9">${p.code}</text>`;
+  const pbW=cnW-24,pbX=cnX+12,pbY=cnY+40;
+  s+=`<rect x="${pbX}" y="${pbY}" width="${pbW}" height="5" rx="3" fill="#1e293b"/>`;
+  s+=`<rect x="${pbX}" y="${pbY}" width="${Math.round(pbW*p.progress/100)}" height="5" rx="3" fill="${st.color}"/>`;
+  s+=`<text x="${CX}" y="${cnY+62}" text-anchor="middle" fill="${st.color}" font-size="9" font-weight="600">${p.progress}% · ${st.label}</text>`;
+
+  // ── PEOPLE branch (left) ─────────────────────────────
+  const pCol='#a78bfa';
+  const pGX=Math.round(CX*0.42), pGY=CY-20;
+  const pStartY=CY-((people.length-1)/2)*38;
+  s+=bez(cnX,CY,pGX+62,pGY,pCol);
+  s+=gnode(pGX,pGY,'👥 Pessoas',pCol);
+  people.forEach((prs,i)=>{
+    const ly=pStartY+i*38;
+    const lx=74;
+    s+=lin(pGX-62,pGY,lx+69,ly,pCol);
+    s+=lnode(lx,ly,'👤',prs.name,prs.role,pCol,140,30);
+  });
+  if(!people.length)s+=`<text x="${pGX}" y="${pGY+24}" text-anchor="middle" fill="#334155" font-size="9">Nenhuma pessoa detectada</text>`;
+
+  // ── TASKS branch (right) ─────────────────────────────
+  const tCol='#34d399';
+  const tGX=Math.round(CX+CX*0.58), tGY=CY-20;
+  const tStartY=CY-((Math.min(tasks.length,8)-1)/2)*36;
+  s+=bez(cnX+cnW,CY,tGX-62,tGY,tCol);
+  s+=gnode(tGX,tGY,'☑️ Tarefas',tCol);
+  tasks.forEach((t,i)=>{
+    const tid=t.id||t.tid;
+    const done=(p.checks||{})[tid];
+    const hasDue=(p.taskDates||{})[tid];
+    const lCol=done?'#10b981':hasDue?'#fbbf24':'#475569';
+    const ico=done?'✅':hasDue?'🔔':'⬜';
+    const txt=(p.taskText||{})[tid]||t.tx||'Tarefa';
+    const ly=tStartY+i*36;
+    const lx=W-74;
+    s+=lin(tGX+62,tGY,lx-69,ly,tCol);
+    s+=lnode(lx,ly,ico,txt,done?'Concluída':'Pendente',lCol,140,30);
+  });
+  if(!tasks.length)s+=`<text x="${tGX}" y="${tGY+24}" text-anchor="middle" fill="#334155" font-size="9">Sem tarefas no stage</text>`;
+
+  // ── DOCS branch (bottom-left) ────────────────────────
+  const dCol='#fbbf24';
+  const dGX=Math.round(CX*0.42), dGY=CY+110;
+  const dStartY=dGY+38;
+  s+=bez(cnX+30,cnY+cnH,dGX+62,dGY-14,dCol);
+  s+=gnode(dGX,dGY,'📄 Docs & Links',dCol,135);
+  docs.forEach((d,i)=>{
+    const ly=dStartY+i*36;
+    const lx=74;
+    s+=lin(dGX-67,dGY+14,lx+69,ly,dCol);
+    s+=lnode(lx,ly,d.icon,d.name,d.sub,d.col||dCol,140,30);
+  });
+  if(!docs.length)s+=`<text x="${dGX}" y="${dGY+32}" text-anchor="middle" fill="#334155" font-size="9">Sem documentos</text>`;
+
+  // ── BLOCKERS branch (bottom-right) ───────────────────
+  const bCol='#f87171';
+  const bGX=Math.round(CX+CX*0.58), bGY=CY+110;
+  const bStartY=bGY+38;
+  s+=bez(cnX+cnW-30,cnY+cnH,bGX-62,bGY-14,bCol);
+  s+=gnode(bGX,bGY,'🚧 Bloqueadores',bCol,140);
+  if(!blockers.length){
+    s+=`<text x="${bGX}" y="${bGY+30}" text-anchor="middle" fill="#10b981" font-size="9" font-weight="600">✅ Sem bloqueadores</text>`;
+  } else {
+    blockers.forEach((b,i)=>{
+      const ly=bStartY+i*36;
+      const lx=W-74;
+      s+=lin(bGX+70,bGY+14,lx-69,ly,bCol);
+      s+=lnode(lx,ly,'🚧',b,'',bCol,140,28);
+    });
+  }
+
+  s+=`</svg>`;
+
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+      <div style="font-size:11px;color:#64748b">Mapa mental · Stage atual: <strong style="color:${st.color}">${st.icon} ${st.label}</strong></div>
+      <div style="display:flex;gap:6px">
+        <button class="jira-btn-sec" style="font-size:10px" onclick="exportDiagramPDF()">⬇ PDF</button>
+        <button class="jira-btn-sec" style="font-size:10px" onclick="exportDiagramSVG()">⬇ SVG</button>
+      </div>
+    </div>
+    <div id="diagramSvgWrap" style="background:#080e1a;border-radius:12px;border:1px solid rgba(71,85,105,.2);overflow:hidden">${s}</div>`;
+}
+
+function exportDiagramPDF(){
+  const svgEl=document.getElementById('mindMapSvg');
+  if(!svgEl){showToast('Aviso','Abra a aba Diagrama primeiro.');return;}
+  const p=getP(selId);
+  const w=window.open('','_blank','width=1050,height=720');
+  if(!w){showToast('Bloqueio de pop-up','Permita pop-ups neste site.');return;}
+  const svgStr=svgEl.outerHTML;
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <title>Diagrama — ${p?.name||''}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#080e1a;display:flex;flex-direction:column;align-items:center;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    .hdr{margin-bottom:14px;text-align:center}
+    .hdr h2{color:#e2e8f0;font-size:16px;font-weight:700;margin-bottom:4px}
+    .hdr p{color:#64748b;font-size:11px}
+    svg{max-width:980px;width:100%;height:auto}
+    .footer{margin-top:14px;font-size:10px;color:#334155}
+    @media print{body{background:#080e1a!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{margin:12mm;size:A4 landscape}}
+  </style></head><body>
+  <div class="hdr"><h2>⚡ ${p?.name||''}</h2><p>${p?.code||''} · Mapa Mental · ${new Date().toLocaleDateString('pt-BR')}</p></div>
+  ${svgStr}
+  <div class="footer">Esteira Valemobi RV · v1.8</div>
+  <script>window.onload=()=>{setTimeout(()=>window.print(),500);}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+function exportDiagramSVG(){
+  const svgEl=document.getElementById('mindMapSvg');
+  if(!svgEl)return;
+  const p=getP(selId);
+  const blob=new Blob(['<?xml version="1.0"?>'+svgEl.outerHTML],{type:'image/svg+xml;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`mapa_${(p?.code||'card').replace(/[/\\ ]/g,'_')}.svg`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+
+/* ── FLUXOGRAMA LINEAR — MAPA GERAL ─────────────────── */
+function openGlobalMap(){
+  document.getElementById('globalMapOverlay').classList.add('open');
+  renderGlobalMap();
+}
+function closeGlobalMap(){
+  document.getElementById('globalMapOverlay').classList.remove('open');
+}
+
+function renderGlobalMap(){
+  const el=document.getElementById('globalMapBody');
+  if(!el)return;
+
+  const active=projects.filter(p=>!p.archived);
+  const urgent=active.filter(p=>p.priority==='urgent').length;
+  const blk=active.filter(p=>p.blockers&&p.blockers.length>0).length;
+  const concl=projects.filter(p=>p.progress>=100).length;
+  const avgProg=active.length?Math.round(active.reduce((s,p)=>s+p.progress,0)/active.length):0;
+
+  // ── Helpers ─────────────────────────────────────────
+  function tl(str,max){return str&&str.length>max?str.substring(0,max)+'…':(str||'');}
+  function sl(lbl){
+    return lbl.replace('Ag. Aprovação de Horas','Ag. Horas')
+              .replace('Descob./Refin.','Descob./Refin.')
+              .replace('Homologação','Homolog.')
+              .replace('Pós-RDM','Pós-RDM');
+  }
+  // daysInStage: defined above
+
+function exportGlobalPDF(){
+  const svgEl=document.getElementById('globalMapSvg');
+  if(!svgEl){showToast('Aviso','Abra o Mapa Geral primeiro.');return;}
+  const w=window.open('','_blank','width=1300,height=800');
+  if(!w){showToast('Bloqueio','Permita pop-ups.');return;}
+  const dt=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <title>Fluxograma — Esteira Valemobi RV</title>
+  <style>*{margin:0;padding:0;box-sizing:border-box}
+  body{background:#06080f;padding:16px 20px;font-family:-apple-system,sans-serif}
+  p{color:#64748b;font-size:10px;text-align:center;margin:8px 0}
+  svg{width:100%;height:auto}
+  @media print{body{background:#06080f!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{margin:5mm;size:A3 landscape}}</style></head><body>
+  <p>Fluxograma Geral · Esteira Valemobi RV · ${dt}</p>
+  ${svgEl.outerHTML}
+  <p>brunogranito.github.io/esteira-valemobi/ · Confidencial</p>
+  <script>window.onload=()=>{setTimeout(()=>window.print(),600);}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+function exportGlobalSVG(){
+  const svgEl=document.getElementById('globalMapSvg');
+  if(!svgEl)return;
+  const blob=new Blob(['<?xml version="1.0"?>'+svgEl.outerHTML],{type:'image/svg+xml;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='fluxograma_esteira_rv.svg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+
 const INIT=[
   {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Charles",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
    desc:"Feature de exibição do Valor Investido (preço médio) para ativos de RV em custódia. Cobre 3 cenários: (1) Ativo de IPO — preço de custo via CRCA, preço de mercado via backoffice; (2) Ativo Lockup sem cotação — preço manual do backoffice; (3) Ativo já negociado B3 — liquidadas usam accepted booking, não-liquidadas usam bucket. Inclui reprocessamento diário de posições.",
@@ -3447,13 +3767,13 @@ function moveStage(sid){
 
 function sw(t){
   curTab=t;
-  const tabs=["info","check","ia","jira","mtg","dep"];
+  const tabs=["info","check","ia","jira","mtg","dep","diag"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===t));
   renderTab();
 }
 function renderTab(){
-  ["tInfo","tCheck","tIa","tJira","tMtg","tDep"].forEach(id=>document.getElementById(id).style.display="none");
-  const map={info:"tInfo",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep"};
+  ["tInfo","tCheck","tIa","tJira","tMtg","tDep","tDiag"].forEach(id=>document.getElementById(id).style.display="none");
+  const map={info:"tInfo",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep",diag:"tDiag"};
   document.getElementById(map[curTab]||"tInfo").style.display="block";
   if(curTab==="info")renderInfo();
   if(curTab==="check")renderCheck();
@@ -3461,6 +3781,7 @@ function renderTab(){
   if(curTab==="jira")renderJiraModal();
   if(curTab==="mtg")renderMeetings();
   if(curTab==="dep")renderDeps();
+  if(curTab==="diag")renderDiagram();
 }
 
 /* ── INFO TAB ───────────────────────────────────────── */
@@ -4437,6 +4758,7 @@ async function initApp(){
   setInterval(checkReminders,60000);
 }
 
+}
 /* ── BOOTSTRAP ── check session or show login ─── */
 if(!checkSession()){
   document.getElementById('loginScreen').style.display='flex';
