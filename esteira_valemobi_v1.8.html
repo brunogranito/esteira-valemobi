@@ -2035,16 +2035,37 @@ let currentUser = null;
 async function sbGetUser(email){
   try{
     const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id,email,name,role,last_login`);
-    const d=await r.json();return d?.[0]||null;
-  }catch(e){return null;}
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d?.[0]||null;
+  }catch(e){console.warn('sbGetUser:',e);return null;}
 }
+
 async function sbCreateUser(email,name,pwHash){
   try{
-    const r=await sbFetch('app_users',{method:'POST',
-      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
-      body:JSON.stringify({email,name,password_hash:pwHash,role:'user'})});
-    const d=await r.json();return Array.isArray(d)?d[0]:d;
-  }catch(e){return null;}
+    const newUser={
+      id: crypto.randomUUID(),
+      email, name,
+      password_hash: pwHash,
+      role: 'user',
+      created_at: new Date().toISOString(),
+    };
+    const r=await sbFetch('app_users',{
+      method:'POST',
+      headers:{'Prefer':'return=minimal'},
+      body:JSON.stringify(newUser),
+    });
+    if(!r.ok){
+      const errText=await r.text().catch(()=>'');
+      console.error('sbCreateUser error:',r.status,errText);
+      return null;
+    }
+    // Return the user object we created (status 201 = success)
+    return newUser;
+  }catch(e){
+    console.error('sbCreateUser exception:',e);
+    return null;
+  }
 }
 async function sbUpdateLastLogin(id){
   try{await sbFetch(`app_users?id=eq.${id}`,{method:'PATCH',
@@ -2091,16 +2112,25 @@ async function doRegister(){
   const errEl=document.getElementById('regErr');
   if(!name||!email||!pass){errEl.textContent='Preencha todos os campos.';return;}
   if(pass.length<6){errEl.textContent='Senha deve ter ao menos 6 caracteres.';return;}
-  errEl.textContent='Criando conta…';
-  const existing=await sbGetUser(email);
-  if(existing){errEl.textContent='E-mail já cadastrado.';return;}
-  const hash=await hashPw(pass);
-  const user=await sbCreateUser(email,name,hash);
-  if(!user){errEl.textContent='Erro ao criar conta. Tente novamente.';return;}
-  currentUser={...user,name,email,role:'user'};
-  lsSet('session',{id:user.id||'new',email,name,role:'user'});
-  logActivity('Conta criada','Novo usuário registrado');
-  loginSuccess();
+  errEl.textContent='Verificando disponibilidade…';
+  try{
+    const existing=await sbGetUser(email);
+    if(existing){errEl.textContent='E-mail já cadastrado. Clique em Entrar.';return;}
+    errEl.textContent='Criando conta…';
+    const hash=await hashPw(pass);
+    const user=await sbCreateUser(email,name,hash);
+    if(!user){
+      errEl.textContent='Erro ao salvar no banco. Verifique se a tabela app_users foi criada no Supabase.';
+      return;
+    }
+    currentUser={...user,name,email,role:'user'};
+    lsSet('session',{id:user.id,email,name,role:'user'});
+    logActivity('Conta criada','Novo usuário registrado');
+    loginSuccess();
+  }catch(e){
+    errEl.textContent='Erro inesperado: '+e.message;
+    console.error('doRegister:',e);
+  }
 }
 
 function loginSuccess(){
