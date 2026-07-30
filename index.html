@@ -1131,13 +1131,13 @@ const PEOPLE=[
 
 const TEMPLATES=[
   {name:"E-mail — Aviso Build em TH",desc:"Para DS: Bispo, Gabriel, Pontes",
-   body:`Assunto: [CÓDIGO] [Nome Demanda] — Build disponível em TH para ensaio\n\nOi pessoal,\n\nInformo que a build do projeto [Nome] ([Código]) já está disponível no ambiente TH e liberada para ensaio.\n\nBuilds implantadas em TH:\n- [serviço 1] — Build [número]\n- [serviço 2] — Build [número]\n\nTask de RDM no Jira: [link]\n\nPor favor, realizem os testes no ambiente TH e retornem com as evidências (prints/logs).\n\nAtt,\nCharles — Analista de Negócios RV / Valemobi`},
+   body:`Assunto: [CÓDIGO] [Nome Demanda] — Build disponível em TH para ensaio\n\nOi pessoal,\n\nInformo que a build do projeto [Nome] ([Código]) já está disponível no ambiente TH e liberada para ensaio.\n\nBuilds implantadas em TH:\n- [serviço 1] — Build [número]\n- [serviço 2] — Build [número]\n\nTask de RDM no Jira: [link]\n\nPor favor, realizem os testes no ambiente TH e retornem com as evidências (prints/logs).\n\nAtt,\nBruno Granito — QA / Valemobi`},
   {name:"E-mail — Ficha e Plano para Ágora/Bradesco",desc:"Envio pré-RDM com a documentação",
-   body:`Assunto: [CÓDIGO] [Nome] — Ficha e Plano de Implantação | RDM [data]\n\nOi [nome],\n\nSegue em anexo a Ficha e o Plano de Implantação referentes ao projeto [Nome] ([Código]), para a RDM prevista para [data/horário].\n\nResumo:\n- Escopo: [breve descrição]\n- Builds: [listar]\n- RITM de Rollback: [número]\n\nSolicito a validação conforme o processo.\n\nAtt,\nCharles — Analista de Negócios RV / Valemobi`},
+   body:`Assunto: [CÓDIGO] [Nome] — Ficha e Plano de Implantação | RDM [data]\n\nOi [nome],\n\nSegue em anexo a Ficha e o Plano de Implantação referentes ao projeto [Nome] ([Código]), para a RDM prevista para [data/horário].\n\nResumo:\n- Escopo: [breve descrição]\n- Builds: [listar]\n- RITM de Rollback: [número]\n\nSolicito a validação conforme o processo.\n\nAtt,\nBruno Granito — QA / Valemobi`},
   {name:"E-mail — Registro de Ocorrências (Pós-RDM)",desc:"Enviar após implantação, reenviar se houver pendência",
-   body:`Assunto: [CÓDIGO] [Nome] — Registro de Ocorrências de Implantação | [data]\n\nOi pessoal,\n\nSegue o registro de ocorrências da implantação realizada em [data/horário].\n\nSTATUS: ✅ CONCLUÍDA / ⚠️ COM RESSALVAS / ❌ REVERTIDA\n\nItens implantados:\n- [serviço 1]: Build [número] — ✅ OK\n\nTestes realizados:\n- [descrever testes realizados]\n\nOcorrências:\n- [listar ou "Nenhuma ocorrência registrada."]\n\nAtt,\nCharles — Analista de Negócios RV / Valemobi`},
+   body:`Assunto: [CÓDIGO] [Nome] — Registro de Ocorrências de Implantação | [data]\n\nOi pessoal,\n\nSegue o registro de ocorrências da implantação realizada em [data/horário].\n\nSTATUS: ✅ CONCLUÍDA / ⚠️ COM RESSALVAS / ❌ REVERTIDA\n\nItens implantados:\n- [serviço 1]: Build [número] — ✅ OK\n\nTestes realizados:\n- [descrever testes realizados]\n\nOcorrências:\n- [listar ou "Nenhuma ocorrência registrada."]\n\nAtt,\nBruno Granito — QA / Valemobi`},
   {name:"Mensagem — Solicitação QA ao Wesley",desc:"Pedir indicação de responsável pelo QA",
-   body:`Oi Wesley,\n\nPrecisaria que um QA ficasse responsável pelos testes da build de [Nome] ([Código]) no ambiente TH.\n\nEscopo dos testes:\n- [descrever cenários principais]\n\nBuild em TH:\n- [serviço]: Build [número]\n\nTask de RDM: [link Jira]\n\nObrigado!\nCharles`},
+   body:`Oi Wesley,\n\nPrecisaria que um QA ficasse responsável pelos testes da build de [Nome] ([Código]) no ambiente TH.\n\nEscopo dos testes:\n- [descrever cenários principais]\n\nBuild em TH:\n- [serviço]: Build [número]\n\nTask de RDM: [link Jira]\n\nObrigado!\nBruno Granito`},
   {name:"Descrição Task — RDM no Jira",desc:"Template padrão para criação de task de RDM",
    body:`[CÓDIGO] [Nome] — Task de RDM\n\nEscopo:\n[descrição do que será implantado]\n\nBuilds a serem implantadas:\n- [listar serviços e builds]\n\nAmbiente: TH → PRD\nData prevista: [data]\nDev responsável: [nome]\nQA responsável: [nome]\nRITM de Rollback: [número]\n\nPrint do Quadro de RDMs: [anexar]\nVincular à: [código ticket pai]`},
   {name:"Descrição Task — Jira (Descoberta concluída)",desc:"Após specs aprovadas, orientar o Dev",
@@ -1317,7 +1317,7 @@ function jiraIssueToCard(issue){
     name:f?.summary||issue.key,
     code:issue.key,
     stage,priority,
-    owner:'Charles',
+    owner:'Bruno Granito',
     desc:f?.description?.content?.[0]?.content?.[0]?.text||'',
     notes:`Importado do Jira em ${new Date().toLocaleDateString('pt-BR')}.\nStatus Jira: ${statusName}`,
     blockers:[],
@@ -1838,7 +1838,7 @@ async function generateBriefing(){
     const dias=daysInStage(p);
     return `• ${p.name} (${p.code}): ${st?.label||p.stage}${dias!==null?' ['+dias+'d]':''}, ${p.progress}%${p.blockers?.length?' 🚧':''}`
   }).join('\n');
-  const sysPrompt=`Você é o assistente de Charles, Analista de Negócios RV na Valemobi.
+  const sysPrompt=`Você é o assistente de Bruno Granito, QA RV na Valemobi.
 Hoje: ${today}
 Projetos ativos: ${active.length}
 Urgentes: ${urgentes.map(p=>p.name).join(', ')||'nenhum'}
@@ -1941,7 +1941,7 @@ function renderMeetings(){
     <div style="font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Nova Ata de Reunião</div>
     <input class="mtg-inp" id="mtgDate" type="date" value="${new Date().toISOString().slice(0,10)}">
     <div class="people-ac-wrap" style="margin-bottom:7px">
-      <input class="mtg-inp" id="mtgPart" placeholder="Participantes (ex: Charles, Gabriel…)" style="margin-bottom:0">
+      <input class="mtg-inp" id="mtgPart" placeholder="Participantes (ex: Bruno, Gabriel…)" style="margin-bottom:0">
       <div class="people-ac-drop" id="mtgPartDrop"></div>
     </div>
     <textarea class="mtg-inp" rows="3" id="mtgNotes" placeholder="Notas e discussões da reunião…"></textarea>
@@ -1965,11 +1965,13 @@ function renderMeetings(){
         </div>
         ${m.notes?`<div class="mtg-notes">${m.notes}</div>`:''}
         ${m.decisions?`<div class="mtg-decisions">✅ ${m.decisions}</div>`:''}
-        ${renderAttachments(m.attachments||[],'meeting',i)}
-        <button onclick="openFilePicker('meeting',${i})"
-          style="background:none;border:1px dashed rgba(71,85,105,.25);color:#475569;padding:3px 10px;border-radius:4px;font-size:10px;cursor:pointer;margin-top:5px">
-          📎 Anexar arquivo
-        </button>
+        <div style="border-top:1px solid rgba(71,85,105,.12);margin-top:8px;padding-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${renderAttachments(m.attachments||[],'meeting',i)}
+          <button onclick="openFilePicker('meeting',${i})"
+            style="background:rgba(71,85,105,.1);border:1px dashed rgba(71,85,105,.35);color:#64748b;padding:4px 12px;border-radius:5px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+            📎 Anexar arquivo à ata
+          </button>
+        </div>
       </div>`;
     }).join('');
   }
@@ -3227,73 +3229,201 @@ function dropOnTask(e,tid,stage){
 }
 
 
+/* ── TASK LINKS & REFERENCES ─────────────────────────────── */
+function toggleTaskRef(tid){
+  const el=document.getElementById('task-ref-'+tid);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+function addTaskLink(tid){
+  const nameEl=document.getElementById('trl-name-'+tid);
+  const urlEl=document.getElementById('trl-url-'+tid);
+  const name=(nameEl?.value||'').trim();
+  const url=(urlEl?.value||'').trim();
+  if(!url){showToast('Informe a URL','');return;}
+  const p=getP(selId);if(!p)return;
+  const taskLinks={...(p.taskLinks||{})};
+  taskLinks[tid]=[...(taskLinks[tid]||[]),{name:name||url,url}];
+  setP(selId,{taskLinks});
+  if(nameEl)nameEl.value='';if(urlEl)urlEl.value='';
+  renderCheck();
+}
+function addTaskLinkFromSystem(tid,name,url){
+  const p=getP(selId);if(!p)return;
+  const taskLinks={...(p.taskLinks||{})};
+  taskLinks[tid]=[...(taskLinks[tid]||[]),{name,url}];
+  setP(selId,{taskLinks});renderCheck();
+}
+function removeTaskLink(tid,idx){
+  const p=getP(selId);if(!p)return;
+  const taskLinks={...(p.taskLinks||{})};
+  taskLinks[tid]=(taskLinks[tid]||[]).filter((_,i)=>i!==idx);
+  setP(selId,{taskLinks});renderCheck();
+}
+function renderTaskRef(p,tid){
+  const links=(p.taskLinks||{})[tid]||[];
+  const attaches=(p.taskAttachments||{})[tid]||[];
+  const systems=getSystems().slice(0,6);
+  return `<div id="task-ref-${tid}" style="display:none;margin:5px 0 2px 22px;padding:8px 10px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:6px">
+    <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📎 Referências da tarefa</div>
+    ${links.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">`+
+      links.map((l,i)=>`<a href="${l.url}" target="_blank"
+        style="font-size:10px;color:#38bdf8;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+        🔗 ${l.name} <span onclick="event.preventDefault();removeTaskLink('${tid}',${i})" style="color:#475569;cursor:pointer">×</span>
+      </a>`).join('')+`</div>`:''}
+    ${attaches.length?renderTaskAttachments(p,tid):''}
+    <div style="display:flex;gap:5px;align-items:flex-start;flex-wrap:wrap">
+      <div style="display:flex;gap:4px;flex:1;min-width:160px">
+        <input id="trl-name-${tid}" placeholder="Nome" style="flex:1;min-width:60px;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 7px;border-radius:4px;font-size:10px;outline:none">
+        <input id="trl-url-${tid}" placeholder="URL" style="flex:2;min-width:100px;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 7px;border-radius:4px;font-size:10px;outline:none"
+          onkeydown="if(event.key==='Enter')addTaskLink('${tid}')">
+        <button onclick="addTaskLink('${tid}')" style="background:rgba(6,182,212,.2);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer">+ Link</button>
+      </div>
+    </div>
+    ${systems.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px">
+      ${systems.map(s=>`<button onclick="addTaskLinkFromSystem('${tid}','${(s.name||'').replace(/'/g,"\'")}','${(s.url||'').replace(/'/g,"\'")}')"
+        style="background:rgba(71,85,105,.1);border:1px solid rgba(71,85,105,.2);color:#64748b;padding:2px 8px;border-radius:3px;font-size:9px;cursor:pointer">
+        ${s.icon||'🔗'} ${s.name}
+      </button>`).join('')}
+    </div>`:''}
+    <button onclick="openFilePicker('task','${tid}')"
+      style="margin-top:5px;background:none;border:1px dashed rgba(71,85,105,.25);color:#64748b;padding:3px 10px;border-radius:4px;font-size:9px;cursor:pointer;width:100%">
+      📁 Anexar arquivo (máx 500KB)
+    </button>
+  </div>`;
+}
+
+function renderTaskAttachments(p,tid){
+  const attaches=(p.taskAttachments||{})[tid]||[];
+  if(!attaches.length)return'';
+  return`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">`+
+    attaches.map((a,i)=>`<a href="${a.data}" download="${a.name}"
+      style="font-size:9px;color:#38bdf8;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);padding:2px 7px;border-radius:3px;text-decoration:none;display:inline-flex;align-items:center;gap:3px">
+      📎 ${a.name} <span onclick="event.preventDefault();removeTaskAttach('${tid}',${i})" style="color:#475569;cursor:pointer">×</span>
+    </a>`).join('')+`</div>`;
+}
+
+function removeTaskAttach(tid,idx){
+  const p=getP(selId);if(!p)return;
+  const ta={...(p.taskAttachments||{})};
+  ta[tid]=(ta[tid]||[]).filter((_,i)=>i!==idx);
+  setP(selId,{taskAttachments:ta});renderCheck();
+}
+
+// Override openFilePicker to handle task target
+const _origOpenFilePicker=openFilePicker;
+function openFilePicker(target,targetId){
+  if(target==='task'){
+    const inp=document.createElement('input');
+    inp.type='file'; inp.accept='image/*,.pdf,.doc,.docx,.xlsx,.txt';
+    inp.onchange=async e=>{
+      const file=e.target.files[0]; if(!file)return;
+      if(file.size>500*1024){showToast('Arquivo grande','Limite: 500KB');return;}
+      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+      const p=getP(selId);if(!p)return;
+      const ta={...(p.taskAttachments||{})};
+      ta[targetId]=[...(ta[targetId]||[]),{name:file.name,type:file.type,data:b64}];
+      setP(selId,{taskAttachments:ta}); renderCheck();
+      showToast('✅ Arquivo anexado',file.name);
+    };
+    inp.click(); return;
+  }
+  _origOpenFilePicker(target,targetId);
+}
+
+/* ── DEFAULT TASK REORDERING ────────────────────────────── */
+function getTaskOrder(p,stageId,sectionS){
+  return (p.taskOrder||{})[stageId]?.[sectionS]||null;
+}
+function applyTaskOrder(tasks,order){
+  if(!order||!order.length)return tasks;
+  const byId=Object.fromEntries(tasks.map(t=>[t.id,t]));
+  const ordered=order.map(id=>byId[id]).filter(Boolean);
+  const rest=tasks.filter(t=>!order.includes(t.id));
+  return [...ordered,...rest];
+}
+function dropOnDefaultTask(e,toTid,stageId,sectionS,taskIds){
+  e.preventDefault();
+  if(!dragTaskId||dragTaskId===toTid)return;
+  const p=getP(selId);if(!p)return;
+  const order=[...taskIds];
+  const fromIdx=order.indexOf(dragTaskId);
+  const toIdx=order.indexOf(toTid);
+  if(fromIdx<0||toIdx<0)return;
+  order.splice(toIdx,0,order.splice(fromIdx,1)[0]);
+  const to={...(p.taskOrder||{})};
+  if(!to[stageId])to[stageId]={};
+  to[stageId][sectionS]=order;
+  setP(selId,{taskOrder:to});renderCheck();
+}
+
+
 const INIT=[
-  {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Charles",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
+  {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Bruno Granito",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
    desc:"Feature de exibição do Valor Investido (preço médio) para ativos de RV em custódia. Cobre 3 cenários: (1) Ativo de IPO — preço de custo via CRCA, preço de mercado via backoffice; (2) Ativo Lockup sem cotação — preço manual do backoffice; (3) Ativo já negociado B3 — liquidadas usam accepted booking, não-liquidadas usam bucket. Inclui reprocessamento diário de posições.",
    blockers:["BINC11: Divergência CRCA vs Mercado","VLMB4: Zero-value display bug","Homolog: apenas 3 dias (20-22/07)"],
    notes:"Reunião crítica 17/07. Gabriel: não deixar cair. RDM agendada 28/07.",
    links:[{n:"BAPD-2246",u:"https://valemobi.atlassian.net/browse/BAPD-2246"},{n:"BAPD-2723",u:"https://valemobi.atlassian.net/browse/BAPD-2723"},{n:"TFS",u:TFS}],checks:{},dis:{}},
-  {id:"ca",name:"Carteiras Automatizadas",code:"BAPG-1450/1501",stage:"qa",priority:"high",owner:"Charles",qa:"Bruno Granito",rmdDate:null,progress:55,
+  {id:"ca",name:"Carteiras Automatizadas",code:"BAPG-1450/1501",stage:"qa",priority:"high",owner:"Bruno Granito",qa:"Bruno Granito",rmdDate:null,progress:55,
    desc:"Novo produto que permite ao cliente aderir a carteiras de investimento com rebalanceamento automático por periodicidade (diário, semanal, etc.) ou por eventos (volatilidade, eventos corporativos). Inclui: prateleira de carteiras no Backoffice (US-01), monitor de boletas (US-02), mesa/basket (US-03), custódia segregada em conta XPTO (US-04), contratação via Novo HB e App (US-05), parâmetros de comissão e Conta Erro 9999300 (US-06). Suitability é informativo, não bloqueante.",
    blockers:["Sinacor: acesso negado (Leo)","Conta Erro 9999300: comportamento indefinido"],
    notes:"US-01 a US-06 completas. Testes com mocks avançando. Modelo distribuição recebido do Pontes.",
    links:[{n:"BAPG-1501",u:"https://valemobi.atlassian.net/browse/BAPG-1501"}],checks:{},dis:{}},
-  {id:"pe",name:"Produtos Estruturados",code:"BAPG-1503",stage:"dev",priority:"high",owner:"Charles",rmdDate:null,progress:40,
+  {id:"pe",name:"Produtos Estruturados",code:"BAPG-1503",stage:"dev",priority:"high",owner:"Bruno Granito",rmdDate:null,progress:40,
    desc:"Integração Valemobi/Ágora com Bradesco para oferta de Produtos Estruturados. Envolve: visões de Backoffice, Cliente e Assessor; fluxo de aceite com SSO Bradesco; suitability como possível bloqueante (High Criticality); reprecificação D+0 intraday; notificações via Firebase/APNs; Messages API; SLA monitoring. USs v1.1/v1.2 e protótipos v2 entregues. Nomenclatura: 'Produtos Estruturados' (não 'Operações Estruturadas').",
    blockers:["Aguardando agenda com Ágora/Bradesco"],
    notes:"USs e protótipos v2 entregues. Gaps de escopo macro pendentes. Pedido de agenda feito 21/07.",
    links:[{n:"BAPG-1503",u:"https://valemobi.atlassian.net/browse/BAPG-1503"}],checks:{},dis:{}},
-  {id:"cr",name:"Custódia Remunerada",code:"BAPG-???",stage:"descoberta",priority:"normal",owner:"Charles",rmdDate:null,progress:30,
+  {id:"cr",name:"Custódia Remunerada",code:"BAPG-???",stage:"descoberta",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:30,
    desc:"Funcionalidade de Custódia Remunerada para clientes de RV. Permite que ativos em custódia gerem remuneração automática. Inclui visões de Backoffice, Cliente e Assessor. US e protótipos em processo de revisão com ajustes de RNs e mocks.",
    blockers:[],notes:"US e protótipos em revisão. Ajustes de RNs e mocks pendentes.",links:[],checks:{},dis:{}},
-  {id:"rap",name:"RAP — Reinvestimento Automático",code:"BAPG-???",stage:"descoberta",priority:"normal",owner:"Charles",rmdDate:null,progress:25,
+  {id:"rap",name:"RAP — Reinvestimento Automático",code:"BAPG-???",stage:"descoberta",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:25,
    desc:"Reinvestimento Automático de Proventos: automatiza o reinvestimento de dividendos e JCP recebidos em RV. Suporta periodicidades Diária, Bimestral, Trimestral, Semestral e Dinâmica (configurável em dias). Estratégias de execução incluem TWAP. Sem notificações transacionais por evento (padrão Ágora).",
    blockers:[],notes:"US em revisão. Periodicidades e TWAP a definir.",links:[],checks:{},dis:{}},
-  {id:"mp",name:"Margem Complementar Venda de Put",code:"BAPG-1544",stage:"descoberta",priority:"normal",owner:"Charles",rmdDate:null,progress:20,
+  {id:"mp",name:"Margem Complementar Venda de Put",code:"BAPG-1544",stage:"descoberta",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:20,
    desc:"Funcionalidade para uso de ativos de RV como margem complementar em operações de Venda de Put descoberta. Integração com TradeSystem e INOA para verificação de elegibilidade, bloqueio e liberação de garantias. USs enviadas para Ágora/Bradesco sem retorno.",
    blockers:["US enviadas sem retorno da Ágora/Bradesco"],notes:"Descoberta/Refinamento. Aguardando retorno.",
    links:[{n:"BAPG-1544",u:"https://valemobi.atlassian.net/browse/BAPG-1544"}],checks:{},dis:{}},
-  {id:"gg",name:"Gestão de Garantias RF — Depósito",code:"BAPD-1327",stage:"homolog",priority:"high",owner:"Ageu/Charles",rmdDate:"13/08/2026",progress:60,
+  {id:"gg",name:"Gestão de Garantias RF — Depósito",code:"BAPD-1327",stage:"homolog",priority:"high",owner:"Ageu/Bruno",rmdDate:"13/08/2026",progress:60,
    desc:"Gestão de Garantias para Renda Fixa no Novo HB e App. Fase 1 (Depósito): permite depositar títulos privados (CDB, LCI, LCA) como garantia em operações via INOA. Integração B3/CETIP com validação de elegibilidade (casamento de campos backoffice x custódia) e atualização em tempo real. Depósito homologado, RDM 13/08. Retirada separada (BAPD-2791).",
    blockers:["Retirada RF: novo time sem prazo","Credencial SINACOR: erro 400 em TI"],
    notes:"Depósito homologado (13/08). Retirada bloqueada — possível problema Synacore. Passagem de conhecimento 16/07.",
    links:[{n:"BAPD-1327",u:"https://valemobi.atlassian.net/browse/BAPD-1327"}],checks:{},dis:{}},
-  {id:"prv",name:"Push de Renda Variável",code:"BAPD-2512",stage:"escopo",priority:"normal",owner:"Charles",rmdDate:null,progress:15,
+  {id:"prv",name:"Push de Renda Variável",code:"BAPD-2512",stage:"escopo",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:15,
    desc:"Funcionalidade para assessores enviarem propostas de operações de RV diretamente ao cliente via push (App e/ou HB). Cliente recebe proposta, visualiza detalhes e aceita ou recusa. Proposta expira automaticamente no fechamento do pregão (sem timer manual). Aguardando 'de acordo' do DS/Ágora — estimativa enviada sem retorno.",
    blockers:["Aguardando 'de acordo' DS/Ágora"],notes:"Estimativa enviada sem retorno. Timer de Expiração descartado.",
    links:[{n:"BAPD-2512",u:"https://valemobi.atlassian.net/browse/BAPD-2512"}],checks:{},dis:{}},
-  {id:"pd",name:"Push de Documentos",code:"BAPD-2511",stage:"escopo",priority:"normal",owner:"Charles",rmdDate:null,progress:15,
+  {id:"pd",name:"Push de Documentos",code:"BAPD-2511",stage:"escopo",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:15,
    desc:"Funcionalidade para envio de documentos com aceite formal do cliente. O assessor seleciona canal (App, HB ou ambos), faz upload do documento, define se é obrigatório (cliente precisa scrollar até o final) e envia. Log regulatório no Backoffice registra IP, timestamp, identificador do aceite e hash do arquivo. Fluxo validado em 02/06.",
    blockers:["Aguardando 'de acordo' DS/Ágora"],notes:"Fluxo validado 02/06. Pendências técnicas mapeadas.",
    links:[{n:"BAPD-2511",u:"https://valemobi.atlassian.net/browse/BAPD-2511"}],checks:{},dis:{}},
-  {id:"as",name:"Alerta Direito de Subscrição",code:"BAPG-1669",stage:"escopo",priority:"normal",owner:"Ewerton/Charles",rmdDate:null,progress:10,
+  {id:"as",name:"Alerta Direito de Subscrição",code:"BAPG-1669",stage:"escopo",priority:"normal",owner:"Ewerton/Bruno",rmdDate:null,progress:10,
    desc:"Alertas automáticos nas boletas de Compra e Venda quando o ativo possui Direito de Subscrição vigente. Escopo confirmado: boleta de Compra mantém alerta existente sem alteração; boleta de Venda adiciona texto informando a quantidade de direitos de subscrição disponíveis. Estimativa de 400+ horas — Gabriel surpreso. Aguardando 'de acordo' DS/Ágora.",
    blockers:["Aguardando 'de acordo' DS/Ágora (400+ horas estimadas)"],
    notes:"Entendimento confirmado. Boleta venda: adicionar texto alerta de subscrição.",
    links:[{n:"BAPG-1669",u:"https://valemobi.atlassian.net/browse/BAPG-1669"}],checks:{},dis:{}},
-  {id:"hb",name:"Horário BM&F",code:"BAPD-???",stage:"qa",priority:"normal",owner:"Charles",rmdDate:null,progress:45,
+  {id:"hb",name:"Horário BM&F",code:"BAPD-???",stage:"qa",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:45,
    desc:"Correção na exibição do horário de negociação de contratos BMF (Futuros) no Novo HB. Problema identificado: horário travado / offset incorreto. Correção via Cheetah Data Streamer — Rony/Yago precisam atualizar o componente no ambiente Alpha para validação.",
    blockers:["Aguardando Rony/Yago atualizar cheetah em Alpha"],notes:"Programado 17:30h. Rony deixou TI funcional.",links:[],checks:{},dis:{}},
-  {id:"nb",name:"Notícias B3",code:"BAPD-2300",stage:"rdm",priority:"normal",owner:"Charles",rmdDate:null,progress:80,
+  {id:"nb",name:"Notícias B3",code:"BAPD-2300",stage:"rdm",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:80,
    desc:"Correção na exibição de notícias da B3 no Novo HB. Script de atualização enviado ao Cabelinho para aplicação. Build trusted-kws implantada com sucesso na RDM de 16/07. Aguardando abertura de RITM para envio ao ambiente FIX (produção).",
    notes:"Script enviado ao Cabelinho. RDM trusted-kws 16/07 ok.",
    links:[{n:"BAPD-2300",u:"https://valemobi.atlassian.net/browse/BAPD-2300"}],checks:{},dis:{}},
-  {id:"cp",name:"Compra Programada de Ações",code:"BAPG-???",stage:"descoberta",priority:"low",owner:"Charles",rmdDate:null,progress:20,
+  {id:"cp",name:"Compra Programada de Ações",code:"BAPG-???",stage:"descoberta",priority:"low",owner:"Bruno Granito",rmdDate:null,progress:20,
    desc:"Funcionalidade para programar compras periódicas automáticas de ações com aporte definido. Suporta periodicidades: Diária, Bimestral, Trimestral, Semestral e Dinâmica (configurável em dias). Estratégia de execução TWAP disponível. USs em revisão com ajustes de periodicidades, adição de TWAP e remoção de seções desnecessárias.",
    blockers:[],notes:"US em revisão. Periodicidades e TWAP.",links:[],checks:{},dis:{}},
-  {id:"qp",name:"Qualificado/Profissional no Gráfico",code:"AMTS-1176",stage:"rdm",priority:"high",owner:"Charles",rmdDate:"28/07/2026",progress:85,
+  {id:"qp",name:"Qualificado/Profissional no Gráfico",code:"AMTS-1176",stage:"rdm",priority:"high",owner:"Bruno Granito",rmdDate:"28/07/2026",progress:85,
    desc:"Ao abrir o papel de um ativo no gráfico do Novo HB, exibir aviso de 'Investidor Qualificado' ou 'Profissional' conforme perfil do cliente. Integração com validação de perfil cadastrado. Ficha e Plano de Implantação prontos. RDM agendada para 28/07 — Dev responsável: identificado com Wesley. Léo precisa participar para testar.",
    notes:"Ficha e Plano prontos. RDM 28/07 precisa do Léo para testar.",
    links:[{n:"AMTS-1176",u:"https://valemobi.atlassian.net/browse/AMTS-1176"}],checks:{},dis:{}},
-  {id:"nm",name:"Novos Módulos HB — Paridade",code:"Novo HB",stage:"homolog",priority:"high",owner:"Charles (RV)",rmdDate:null,progress:35,
+  {id:"nm",name:"Novos Módulos HB — Paridade",code:"Novo HB",stage:"homolog",priority:"high",owner:"Bruno Granito",rmdDate:null,progress:35,
    desc:"Homologação dos novos módulos do Novo HB para alcançar paridade funcional com o HB antigo. Módulos: Venda Descoberta, Tesouro Direto, Produtos, One Click Journey. Responsáveis por área: Denis (visão Assessor / Trade System), Maga e Rafa (visão Cliente RV), Rodolfo (Produtos). Reuniões recorrentes terça e quinta 15min. Alvo: 12/08. Pacote extra de melhorias layout/front 04/08 → deploy 18/08.",
    notes:"Kickoff 16/07. Denis/Maga/Rafa/Rodolfo. Alvo: 12/08. Pacote extra 04/08.",links:[],checks:{},dis:{}},
-  {id:"gg2",name:"Gestão de Garantias — Retirada Título Privado",code:"BAPD-2791",stage:"homolog",priority:"high",owner:"Charles/Ageu",rmdDate:null,progress:0,
+  {id:"gg2",name:"Gestão de Garantias — Retirada Título Privado",code:"BAPD-2791",stage:"homolog",priority:"high",owner:"Bruno/Ageu",rmdDate:null,progress:0,
    desc:"Fase 2 da Gestão de Garantias RF. Retirada de títulos privados (CDB/LCI/LCA) depositados como garantia em operações. Bloqueada por erro de credencial SINACOR (400 Bad Request) ao autenticar no ambiente TI. Investigação indica diferença no Client Secret entre TI e TH. Possível problema nos módulos Synacore que aparecem como fechados. Novo time recebeu passagem de conhecimento em 16/07 — sem prazo definido.",
    blockers:["Credencial SINACOR: erro 400 Bad Request em TI","Novo time responsável pela retirada sem prazo definido"],
    notes:"Criado 16/07/26. Retirada de título privado com erro. Aguardando cliente/homologação. Separado do BAPD-1327 (depósito).",
    links:[{n:"BAPD-2791",u:"https://valemobi.atlassian.net/browse/BAPD-2791"},{n:"BAPD-1327",u:"https://valemobi.atlassian.net/browse/BAPD-1327"}],checks:{},dis:{}},
-  {id:"vale3",name:"VALE3 — Preço Médio de Aquisição",code:"BAPD-2835",stage:"qa",priority:"normal",owner:"Charles",rmdDate:null,progress:0,
+  {id:"vale3",name:"VALE3 — Preço Médio de Aquisição",code:"BAPD-2835",stage:"qa",priority:"normal",owner:"Bruno Granito",rmdDate:null,progress:0,
    desc:"Bug reportado pelo cliente: preço médio de aquisição de VALE3 exibido incorretamente. Criado em 24/07/26. Relacionado ao épico BAPD-2652 (RV Melhorias). Status Jira: Aguardando cliente — aguardando validação do comportamento correto pelo time Ágora/Bradesco. Pode ter relação com o cálculo de preço médio em cenários de custódia virtual ou IPO.",
    blockers:["Aguardando cliente: validação do comportamento do preço médio"],
    notes:"Criado 24/07/26. Issue em VALE3 — preço médio de aquisição com comportamento incorreto. Parent: BAPD-2652 (RV Melhorias).",
@@ -3899,6 +4029,10 @@ function renderCheck(){
     const notDis=tasks.filter(t=>!(p.dis||{})[t.id]);
     const done=notDis.filter(t=>(p.checks||{})[t.id]).length;
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
+    // Apply custom order to default tasks
+    const taskOrder=getTaskOrder(p,active,sec.s);
+    const orderedTasks=applyTaskOrder(tasks,taskOrder);
+    const taskIds=orderedTasks.map(t=>t.id);
     h+=`<div class="cl-sec"><div class="cl-sec-hd">
       <span id="sec-label-${active}-${sIdx}">${secLabel}</span>
       <button onclick="startEditSection('${active}',${sIdx},'${secLabel.replace(/'/g,"\\'")}')"
@@ -3909,8 +4043,8 @@ function renderCheck(){
         <button class="add-sec-btn" onclick="showAddTask('${sec.s}','${active}')">+</button>
       </div>
     </div>`;
-    tasks.forEach(task=>{
-      h+=renderTaskRow(p,task.id,{...task,tx:(p.taskText||{})[task.id]||task.tx},false,active);
+    orderedTasks.forEach(task=>{
+      h+=renderTaskRow(p,task.id,{...task,tx:(p.taskText||{})[task.id]||task.tx},false,active,sec.s,taskIds);
     });
     h+=`</div>`;
   });
@@ -3921,7 +4055,7 @@ function renderCheck(){
     const doneC=notDisC.filter(t=>(p.checks||{})[t.tid]).length;
     h+=`<div class="cl-sec"><div class="cl-sec-hd"><span>➕ Tarefas adicionadas</span><div style="display:flex;align-items:center;gap:7px"><span class="cl-sec-pct">${doneC}/${notDisC.length}</span></div></div>`;
     customByStage.forEach(ct=>{
-      h+=renderTaskRow(p,ct.tid,{id:ct.tid,tx:ct.tx,info:null,links:[]},true,active);
+      h+=renderTaskRow(p,ct.tid,{id:ct.tid,tx:ct.tx,info:null,links:[]},true,active,'__custom__',[]);
     });
     h+=`</div>`;
   }
@@ -3941,7 +4075,7 @@ function renderCheck(){
   document.getElementById("tCheck").innerHTML=h;
 }
 
-function renderTaskRow(p,tid,task,isCustom,activeStage){
+function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   const chk=(p.checks||{})[tid]||false;
   const dis=(p.dis||{})[tid]||false;
   const exp=expanded[tid]||false;
@@ -3949,8 +4083,15 @@ function renderTaskRow(p,tid,task,isCustom,activeStage){
   const isEditing=taskEditing===tid;
   const due=(p.taskDates||{})[tid]||"";
   const hasDue=!!due;
-  let h=`<div class="clt${dis?" dis":""}" id="clt-${tid}">
+  const hasRef=!!((p.taskLinks||{})[tid]?.length||(p.taskAttachments||{})[tid]?.length);
+  let h=`<div class="clt${dis?" dis":""}" id="clt-${tid}"
+    draggable="true"
+    ondragstart="startDragTask(event,'${tid}','${activeStage}')"
+    ondragend="endDragTask(event)"
+    ondragover="${isCustom?`dragOverTask(event,'${tid}','${activeStage}')`:`dragOverTask(event,'${tid}','${activeStage}')`}"
+    ondrop="${isCustom?`dropOnTask(event,'${tid}','${activeStage}')`:`dropOnDefaultTask(event,'${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}',${JSON.stringify(taskIds||[])})`}">
     <div class="clt-main">
+      <span style="cursor:grab;color:#283548;font-size:12px;flex-shrink:0" title="Arrastar para reordenar">⠿</span>
       <input type="checkbox" class="clt-chk" id="ck-${tid}" ${chk?"checked":""} ${dis?"disabled":""}
              onchange="toggleCk('${tid}',this.checked,'${activeStage}')">`;
   if(isEditing){
@@ -3981,6 +4122,8 @@ function renderTaskRow(p,tid,task,isCustom,activeStage){
     }
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
     if(!isEditing) h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
+    h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
+      style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:12px;padding:2px 3px">${hasRef?'📎':'📎'}</button>`;
   } else {
     h+=`<button class="add-task-ok" style="font-size:10px;padding:2px 7px" onclick="saveTaskText('${tid}','${activeStage}',${isCustom})">✓</button>`;
     h+=`<button class="add-task-x" style="font-size:10px;padding:2px 6px" onclick="cancelEditTask()">✕</button>`;
@@ -3991,6 +4134,7 @@ function renderTaskRow(p,tid,task,isCustom,activeStage){
     <input class="task-due-inp" type="datetime-local" value="${due}" onchange="setTaskDue('${tid}','${activeStage}',this.value)">
     ${hasDue?`<button onclick="setTaskDue('${tid}','${activeStage}','')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;margin-top:3px">✕ Remover lembrete</button>`:""}
   </div>`;
+  h+=renderTaskRef(p,tid);
   // expanded detail
   if(exp&&hasDetail){
     h+=`<div class="clt-detail">`;
@@ -4689,7 +4833,7 @@ function buildCtx(p){
   const allTasks=(CL[clS]||[]).flatMap(s=>s.t);
   const enabled=allTasks.filter(t=>!(p.dis||{})[t.id]);
   const done=enabled.filter(t=>(p.checks||{})[t.id]).length;
-  return `Você é o assistente interno de Charles, Analista de Negócios de Renda Variável na Valemobi.
+  return `Você é o assistente interno de Bruno Granito, QA de Renda Variável na Valemobi.
 
 DEMANDA ATUAL:
 Nome: ${p.name}
@@ -4706,7 +4850,7 @@ ${p.blockers?.length?p.blockers.map(b=>"• "+b).join("\n"):"Nenhum."}
 CONTEXTO/NOTAS:
 ${p.notes||"Sem notas."}
 
-Responda sempre em português brasileiro. Seja objetivo e prático. Ajude Charles a desbloquear e avançar a demanda.`;
+Responda sempre em português brasileiro. Seja objetivo e prático. Ajude Bruno Granito a desbloquear e avançar a demanda.`;
 }
 function renderAI(){
   const p=getP(selId);if(!p)return;
@@ -4813,8 +4957,16 @@ async function initApp(){
 }
 
 /* ── BOOTSTRAP ── check session or show login ─── */
+// Migra sessão antiga de Charles para Bruno Granito
+(()=>{
+  const sess=lsGet('session');
+  if(sess&&(sess.name==='Charles'||sess.email==='charles@valemobi')){
+    sess.name='Bruno Granito';sess.email='bruno.granito@valemobi';sess.id='bruno';
+    lsSet('session',sess);
+  }
+})();
 if(!checkSession()){
-  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginScreen')?.style.display && (document.getElementById('loginScreen').style.display='flex');
 }
 </script>
 </body>
