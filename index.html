@@ -3284,34 +3284,48 @@ function removeTaskLink(tid,idx){
   taskLinks[tid]=(taskLinks[tid]||[]).filter((_,i)=>i!==idx);
   setP(selId,{taskLinks});renderCheck();
 }
-function renderTaskRef(p,tid){
-  const links=(p.taskLinks||{})[tid]||[];
-  const attaches=(p.taskAttachments||{})[tid]||[];
-  const systems=getSystems().slice(0,6);
-  return `<div id="task-ref-${tid}" style="display:none;margin:5px 0 2px 22px;padding:8px 10px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:6px">
-    <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📎 Referências da tarefa</div>
-    ${links.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">`+
-      links.map((l,i)=>`<a href="${l.url}" target="_blank"
-        style="font-size:10px;color:#38bdf8;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-        🔗 ${l.name} <span onclick="event.preventDefault();removeTaskLink('${tid}',${i})" style="color:#475569;cursor:pointer">×</span>
-      </a>`).join('')+`</div>`:''}
-    ${attaches.length?renderTaskAttachments(p,tid):''}
-    <div style="display:flex;gap:5px;align-items:flex-start;flex-wrap:wrap">
-      <div style="display:flex;gap:4px;flex:1;min-width:160px">
-        <input id="trl-name-${tid}" placeholder="Nome" style="flex:1;min-width:60px;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 7px;border-radius:4px;font-size:10px;outline:none">
-        <input id="trl-url-${tid}" placeholder="URL" style="flex:2;min-width:100px;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 7px;border-radius:4px;font-size:10px;outline:none"
-          onkeydown="if(event.key==='Enter')addTaskLink('${tid}')">
-        <button onclick="addTaskLink('${tid}')" style="background:rgba(6,182,212,.2);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer">+ Link</button>
+function renderTaskRef(p,tid,task){
+  const userLinks=(p.taskLinks||{})[tid]||[];
+  const userAttach=(p.taskAttachments||{})[tid]||[];
+  const defaultLinks=(task?.links||[]).map((l,i)=>{
+    const edit=(p.taskLinkEdits||{})[tid]?.[i];
+    return {name:edit?.name||l.n, url:edit?.url||l.u, isDefault:true, dIdx:i};
+  });
+  const allLinks=[...defaultLinks,...userLinks.map((l,i)=>({...l,isDefault:false,uIdx:i}))];
+  const systems=getSystems().slice(0,8);
+  const totalAll=allLinks.length+userAttach.length;
+
+  return `<div id="task-ref-${tid}" style="display:none;margin:5px 0 4px 22px;padding:8px 10px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:6px;font-size:10px">
+    ${totalAll===0?'':`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">`+
+      allLinks.map(l=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);padding:2px 8px;border-radius:4px;font-size:10px">
+        <a href="${l.url}" target="_blank" style="color:#38bdf8;text-decoration:none">🔗 ${l.name}</a>
+        <button onclick="editTaskLink('${tid}',${l.isDefault?l.dIdx:-1},${l.isDefault?1:0},${l.isDefault?l.dIdx:(l.uIdx||0)})" title="Editar"
+          style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;padding:0 1px">✏</button>
+        ${l.isDefault?'':'<button onclick="removeTaskLink(\''+tid+'\',' +(l.uIdx||0) +')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 1px">×</button>'}
+      </span>`).join('')+
+      userAttach.map((a,i)=>`<a href="${a.data}" download="${a.name}"
+        style="display:inline-flex;align-items:center;gap:3px;color:#38bdf8;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);padding:2px 8px;border-radius:4px;text-decoration:none;font-size:10px">
+        📎 ${a.name}
+        <span onclick="event.preventDefault();removeTaskAttach('${tid}',${i})" style="color:#475569;cursor:pointer">×</span>
+      </a>`).join('')+`</div>`
+    }
+    <div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Adicionar referência</div>
+    <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+      <div style="position:relative;flex:2;min-width:120px">
+        <input id="trl-name-${tid}" data-tid="${tid}" placeholder="Nome ou buscar sistema…"
+          style="width:100%;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:10px;outline:none;box-sizing:border-box"
+          oninput="filterTaskRefAC(this.dataset.tid,this.value)" onblur="setTimeout(()=>closeTaskRefAC(this.dataset.tid),200)">
+        <div id="trl-ac-${tid}" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);background:#1e293b;border:1px solid rgba(71,85,105,.4);border-radius:5px;z-index:1000;max-height:130px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.5)"></div>
       </div>
+      <input id="trl-url-${tid}" placeholder="URL" style="flex:3;min-width:120px;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:10px;outline:none"
+        onkeydown="if(event.key==='Enter')addTaskLink(this.closest('[id^=task-ref]').id.replace('task-ref-',''))">
+      <button onclick="addTaskLink('${tid}')" style="background:rgba(6,182,212,.2);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:4px 9px;border-radius:4px;font-size:10px;cursor:pointer;flex-shrink:0">+ Link</button>
     </div>
-    ${systems.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px">
-      ${systems.map(s=>`<button onclick="addTaskLinkFromSystem('${tid}','${(s.name||'').replace(/'/g,"\'")}','${(s.url||'').replace(/'/g,"\'")}')"
-        style="background:rgba(71,85,105,.1);border:1px solid rgba(71,85,105,.2);color:#64748b;padding:2px 8px;border-radius:3px;font-size:9px;cursor:pointer">
-        ${s.icon||'🔗'} ${s.name}
-      </button>`).join('')}
-    </div>`:''}
+    ${systems.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">${systems.map(s=>`<button
+        onclick="taskRefPickSys('${tid}','${(s.name||'').replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}')"
+        style="background:rgba(71,85,105,.1);border:1px solid rgba(71,85,105,.2);color:#64748b;padding:2px 7px;border-radius:3px;font-size:9px;cursor:pointer">${s.icon||'🔗'} ${s.name}</button>`).join('')}</div>`:''}
     <button onclick="openFilePicker('task','${tid}')"
-      style="margin-top:5px;background:none;border:1px dashed rgba(71,85,105,.25);color:#64748b;padding:3px 10px;border-radius:4px;font-size:9px;cursor:pointer;width:100%">
+      style="background:none;border:1px dashed rgba(71,85,105,.25);color:#64748b;padding:3px 10px;border-radius:4px;font-size:9px;cursor:pointer;width:100%;box-sizing:border-box">
       📁 Anexar arquivo (máx 500KB)
     </button>
   </div>`;
@@ -3486,6 +3500,65 @@ function removeTplAttach(tplIdx,ai,el){
   saveMenuData('templates',arr);
   el?.closest('a')?.remove();
   showToast('🗑 Anexo removido','');
+}
+
+
+/* ── PERMANENT TASKS (persist across all cards in a stage) ─ */
+function getPermanentTasks(){ return lsGet('permanentTasks')||{}; }
+function savePermanentTasks(data){ lsSet('permanentTasks',data); sbSet('permanentTasks',data).catch(()=>{}); }
+
+function promoteTaskToDefault(tid,stageId,sectionS){
+  const p=getP(selId);if(!p)return;
+  const ct=((p.customTasks||{})[stageId]||[]).find(t=>t.tid===tid);
+  if(!ct){showToast('Erro','Apenas tarefas customizadas podem ser promovidas.');return;}
+  if(!confirm(`Tornar "${ct.tx}" uma tarefa padrão em todos os cards do stage "${STAGES.find(s=>s.id===stageId)?.label||stageId}"?\n\nEla aparecerá em todos os novos cards desta esteira.`))return;
+  const data=getPermanentTasks();
+  if(!data[stageId])data[stageId]=[];
+  // avoid duplicate
+  if(!data[stageId].find(t=>t.tid===tid)){
+    data[stageId].push({tid,tx:ct.tx,sectionS:sectionS||'Tarefas Adicionadas'});
+    savePermanentTasks(data);
+    showToast('🌟 Tarefa promovida',`"${ct.tx}" agora aparece em todos os cards de ${STAGES.find(s=>s.id===stageId)?.label||stageId}.`);
+  }
+}
+
+// ── Cross-section drag: allow custom tasks to drop into default sections ──
+// Override dropOnAnyTask to handle cross-section drops
+const _origDropOnAny=dropOnAnyTask;
+function dropOnAnyTask(e,toTid,stageId,sectionKey){
+  e.preventDefault();e.stopPropagation();
+  if(!dragTaskId||dragTaskId===toTid)return;
+  const fromKey=dragTaskStage+'|||__custom__';
+  const isFromCustom=(_sectionTaskIds[fromKey]||[]).includes(dragTaskId);
+
+  // If dragging custom task to a default section, inject it there
+  if(isFromCustom&&sectionKey!==fromKey){
+    const p=getP(selId);if(!p)return;
+    const toSectionS=sectionKey.split('|||')[1];
+    if(toSectionS==='__custom__'){
+      // reorder within custom
+      _origDropOnAny(e,toTid,stageId,sectionKey);
+      return;
+    }
+    // Move: remove from custom, inject into default section order
+    const customTasks=[...((p.customTasks||{})[stageId]||[])];
+    const task=customTasks.find(t=>t.tid===dragTaskId);
+    if(!task)return;
+    const newCustom=customTasks.filter(t=>t.tid!==dragTaskId);
+    // Add as injected task in target section
+    const injected={...(p.injectedTasks||{})};
+    if(!injected[stageId])injected[stageId]={};
+    const secList=[...(injected[stageId][toSectionS]||[])];
+    // Insert at position of toTid
+    const toIds=_sectionTaskIds[sectionKey]||[];
+    const toIdx=toIds.indexOf(toTid);
+    secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:task.tx});
+    injected[stageId][toSectionS]=secList;
+    setP(selId,{customTasks:{...(p.customTasks||{}),[stageId]:newCustom},injectedTasks:injected});
+    renderCheck();
+    return;
+  }
+  _origDropOnAny(e,toTid,stageId,sectionKey);
 }
 
 
@@ -4161,10 +4234,13 @@ function renderCheck(){
     const notDis=tasks.filter(t=>!(p.dis||{})[t.id]);
     const done=notDis.filter(t=>(p.checks||{})[t.id]).length;
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
-    // Apply custom order to default tasks
-    const taskOrder=getTaskOrder(p,active,sec.s);
-    const orderedTasks=applyTaskOrder(tasks,taskOrder);
-    const taskIds=orderedTasks.map(t=>t.id);
+    // Apply custom order to default tasks + inject permanent + injected tasks
+    const permanentInSec=(getPermanentTasks()[active]||[]).filter(t=>t.sectionS===sec.s);
+    const injectedInSec=((getP(selId)?.injectedTasks||{})[active]?.[sec.s]||[]);
+    const allSecTasks=[...orderedTasks,...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))];
+    const taskIds=allSecTasks.map(t=>t.id);
+    // Store for drag-drop
+    _sectionTaskIds[active+'|||'+sec.s]=taskIds;
     h+=`<div class="cl-sec"><div class="cl-sec-hd">
       <span id="sec-label-${active}-${sIdx}">${secLabel}</span>
       <button onclick="startEditSection('${active}',${sIdx},'${secLabel.replace(/'/g,"\\'")}')"
@@ -4175,11 +4251,10 @@ function renderCheck(){
         <button class="add-sec-btn" onclick="showAddTask('${sec.s}','${active}')">+</button>
       </div>
     </div>`;
-    orderedTasks.forEach(task=>{
-      h+=renderTaskRow(p,task.id,{...task,tx:(p.taskText||{})[task.id]||task.tx},false,active,sec.s,taskIds);
+    allSecTasks.forEach(task=>{
+      const isExtra=task.isPermanent||task.isInjected;
+      h+=renderTaskRow(p,task.id,task,isExtra,active,sec.s,taskIds);
     });
-    // Store task IDs for drag-drop (global store approach)
-    _sectionTaskIds[active+'|||'+sec.s]=taskIds;
     h+=`</div>`;
   });
 
@@ -4215,7 +4290,7 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   const chk=(p.checks||{})[tid]||false;
   const dis=(p.dis||{})[tid]||false;
   const exp=expanded[tid]||false;
-  const hasDetail=!!(task.info||task.links?.length);
+  const hasDetail=!!(task.info); // links moved to ref panel
   const isEditing=taskEditing===tid;
   const due=(p.taskDates||{})[tid]||"";
   const hasDue=!!due;
@@ -4253,7 +4328,9 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
       <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
       <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
     </select>`;
-    if(isCustom) h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>`;
+    if(isCustom) h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>
+      <button onclick="promoteTaskToDefault('${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}')" title="Tornar tarefa padrão neste stage"
+        style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:1px 3px" title="Tornar padrão">🌟</button>`;
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
     h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
     h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
@@ -4274,7 +4351,7 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   if(exp&&hasDetail){
     h+=`<div class="clt-detail">`;
     if(task.info) h+=`<div class="clt-info">${task.info}</div>`;
-    if(task.links?.length) h+=`<div class="clt-links">${task.links.map(l=>`<a class="clt-lnk" href="${l.u}" target="_blank">↗ ${l.n}</a>`).join("")}</div>`;
+    // default links now shown in ref panel (📎)
     h+=`</div>`;
   }
   return h+`</div>`;
