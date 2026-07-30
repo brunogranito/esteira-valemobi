@@ -4883,78 +4883,67 @@ async function sendAI(){
 
 /* ── INIT (chamado após login) ───────────────────────── */
 async function initApp(){
-  setSbBadge('syncing','Conectando à nuvem…');
+  // ── 1. RENDERIZAR IMEDIATAMENTE com dados locais ─────────
+  loadProjectsLocal();
+  loadOrdersLocal();
+  loadMenuData();
+  projects=projects.map(p=>{
+    if(p.archived)return p;
+    try{const pct=autoProgress(p);return pct!==p.progress?{...p,progress:pct}:p;}catch(e){return p;}
+  });
+  renderBoard();
+  renderStats();
+  requestNotifPerm();
+  checkReminders();
+  setInterval(checkReminders,60000);
 
+  // ── 2. SINCRONIZAR COM SUPABASE EM BACKGROUND (sem bloquear) ──
+  setSbBadge('syncing','Sincronizando…');
   try{
-    // 1. Tentar carregar projetos do Supabase
-    const [sbProjects, sbOrders, sbJiraCfg] = await Promise.all([
-      sbGet('projects'),
-      sbGet('orders'),
-      sbGet('jira_cfg'),  // config sem token (email, domain, useProxy)
+    const timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),7000));
+    const [sbProjects,sbOrders,sbJiraCfg]=await Promise.race([
+      Promise.all([sbGet('projects'),sbGet('orders'),sbGet('jira_cfg')]),
+      timeout.then(()=>{throw new Error('timeout');})
     ]);
 
-    // Merge Supabase jira_cfg with localStorage token
-    if(sbJiraCfg){
-      const localJira=lsGet('jira')||{};
-      if(!localJira.token&&jiraConfig.token){
-        // Já temos token na variável, só atualiza email/domain
-      }
-      jiraConfig={
-        email:localJira.email||sbJiraCfg.email||'',
-        token:localJira.token||jiraConfig.token||'',
-        domain:localJira.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
-        useProxy:localJira.useProxy!==undefined?localJira.useProxy:sbJiraCfg.useProxy!==false,
-      };
-      if(jiraConfig.email) lsSet('jira',jiraConfig);
-    }
-
+    let updated=false;
     if(sbProjects?.length){
-      // Supabase tem dados — usar esses (mais recentes)
-      projects=sbProjects;
-      lsSet('projects',projects); // sincronizar localStorage
-    } else {
-      // Supabase vazio — carregar do localStorage (migração)
-      loadProjectsLocal();
-      if(projects.length>0){
-        // Migrar localStorage → Supabase
-        setSbBadge('syncing','Migrando dados para a nuvem…');
-        await sbSet('projects',projects);
-      }
+      projects=sbProjects;lsSet('projects',projects);updated=true;
+    } else if(projects.length){
+      sbSet('projects',projects).catch(()=>{});
     }
 
     if(sbOrders&&Object.keys(sbOrders).length){
-      stageOrders=sbOrders;
-      lsSet('orders',stageOrders);
-    } else {
-      loadOrdersLocal();
-      if(Object.keys(stageOrders).length>0) await sbSet('orders',stageOrders);
+      stageOrders=sbOrders;lsSet('orders',stageOrders);
+    } else if(Object.keys(stageOrders).length){
+      sbSet('orders',stageOrders).catch(()=>{});
+    }
+
+    if(sbJiraCfg){
+      const lj=lsGet('jira')||{};
+      jiraConfig={email:lj.email||sbJiraCfg.email||'',token:lj.token||jiraConfig.token||'',
+        domain:lj.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
+        useProxy:lj.useProxy!==undefined?lj.useProxy:sbJiraCfg.useProxy!==false};
+      if(jiraConfig.email)lsSet('jira',jiraConfig);
+    }
+
+    if(updated){
+      projects=projects.map(p=>{
+        if(p.archived)return p;
+        try{const pct=autoProgress(p);return pct!==p.progress?{...p,progress:pct}:p;}catch(e){return p;}
+      });
+      renderBoard();renderStats();
     }
 
     const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     setSbBadge('synced',`☁ Sincronizado às ${now}`);
 
   }catch(e){
-    // Supabase indisponível — usar localStorage
-    loadProjectsLocal();
-    loadOrdersLocal();
     setSbBadge('offline','⚠ Offline — dados locais');
-    console.warn('Supabase indisponível:',e);
+    console.warn('Supabase:',e.message);
   }
-
-  // Auto-calcular progresso de todos os projetos
-  projects=projects.map(p=>{
-    if(p.archived)return p;
-    try{const pct=autoProgress(p);return pct!==p.progress?{...p,progress:pct}:p;}
-    catch(e){return p;}
-  });
-
-  loadMenuData();
-  renderBoard();
-  renderStats();
-  requestNotifPerm();
-  checkReminders();
-  setInterval(checkReminders,60000);
 }
+
 
 /* ── BOOTSTRAP — inicia direto, sem login ─── */
 (()=>{
