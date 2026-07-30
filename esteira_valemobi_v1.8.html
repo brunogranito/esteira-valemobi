@@ -1013,7 +1013,9 @@ const CL={
       {id:"r12",tx:"Abrir RITM de Rollback e quantidade de Pods (conforme modelo Ageu)",
        info:"• Incluir prints da RITM de Rollback no comentário da Task de RDM\n• Quando o Pod retornar vazio: verificar com o Dev antes de prosseguir",
        links:[{n:"Abrir RITM (Rollback)",u:RITM},{n:"Consultar RITMs",u:RITM_C}]},
-      {id:"r13",tx:"Confeccionar Ficha e Plano de Implantação",
+      {id:"r13a",tx:"Confeccionar Ficha de Implantação",
+       info:"Colocar no comentário da Task e solicitar validação do Dev responsável."},
+      {id:"r13b",tx:"Confeccionar Plano de Importação",
        info:"Colocar no comentário da Task e solicitar validação do Dev responsável."},
       {id:"r14",tx:"Enviar Ficha e Plano para Ágora/Bradesco",
        info:"• Itens mergeados com nosso pacote → copiar analistas internos + POs no e-mail\n• Nosso pacote mergeado com outros → enviar só a ficha ao responsável pela RDM"},
@@ -3202,29 +3204,52 @@ function saveSectionEdit(){
 }
 function cancelSectionEdit(){editingSection={stage:null,secIdx:null};renderCheck();}
 
-/* ── TASK REORDERING ────────────────────────────────────── */
-let dragTaskId=null,dragTaskStage=null;
+/* ── TASK REORDERING (global store) ─────────────────────── */
+let _dragSectionKey=null; // "stageId|||sectionS"
+const _sectionTaskIds={}; // key → [tid,...]
 
 function startDragTask(e,tid,stage){
   dragTaskId=tid;dragTaskStage=stage;
   e.dataTransfer.effectAllowed='move';
-  e.currentTarget.style.opacity='0.5';
+  e.currentTarget.style.opacity='0.4';
 }
-function endDragTask(e){e.currentTarget.style.opacity='1';dragTaskId=null;dragTaskStage=null;}
+function endDragTask(e){
+  e.currentTarget.style.opacity='1';
+  dragTaskId=null;dragTaskStage=null;
+}
 function dragOverTask(e,tid,stage){
-  if(!dragTaskId||dragTaskId===tid||dragTaskStage!==stage)return;
-  e.preventDefault();e.dataTransfer.dropEffect='move';
-}
-function dropOnTask(e,tid,stage){
+  if(!dragTaskId||dragTaskId===tid)return;
   e.preventDefault();
-  if(!dragTaskId||dragTaskId===tid||dragTaskStage!==stage)return;
+  e.dataTransfer.dropEffect='move';
+}
+function dropOnAnyTask(e,toTid,stageId,sectionKey){
+  e.preventDefault();e.stopPropagation();
+  if(!dragTaskId||dragTaskId===toTid)return;
   const p=getP(selId);if(!p)return;
-  const tasks=[...((p.customTasks||{})[stage]||[])];
-  const fromIdx=tasks.findIndex(t=>t.tid===dragTaskId);
-  const toIdx=tasks.findIndex(t=>t.tid===tid);
+  const ids=_sectionTaskIds[sectionKey];
+  if(!ids||!ids.length)return;
+  const order=[...ids];
+  const fromIdx=order.indexOf(dragTaskId);
+  const toIdx=order.indexOf(toTid);
   if(fromIdx<0||toIdx<0)return;
-  tasks.splice(toIdx,0,tasks.splice(fromIdx,1)[0]);
-  setP(selId,{customTasks:{...(p.customTasks||{}),[stage]:tasks}});
+  order.splice(toIdx,0,order.splice(fromIdx,1)[0]);
+  const [sId,secS]=sectionKey.split('|||');
+  if(secS==='__custom__'){
+    // Reorder custom tasks
+    const ct=[...((p.customTasks||{})[sId]||[])];
+    const fromTask=ct.find(t=>t.tid===dragTaskId);
+    const toTask=ct.find(t=>t.tid===toTid);
+    if(!fromTask||!toTask)return;
+    const fi=ct.indexOf(fromTask),ti=ct.indexOf(toTask);
+    ct.splice(ti,0,ct.splice(fi,1)[0]);
+    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
+  } else {
+    // Reorder default tasks — store order
+    const to={...(p.taskOrder||{})};
+    if(!to[sId])to[sId]={};
+    to[sId][secS]=order;
+    setP(selId,{taskOrder:to});
+  }
   renderCheck();
 }
 
@@ -3341,20 +3366,7 @@ function applyTaskOrder(tasks,order){
   const rest=tasks.filter(t=>!order.includes(t.id));
   return [...ordered,...rest];
 }
-function dropOnDefaultTask(e,toTid,stageId,sectionS,taskIds){
-  e.preventDefault();
-  if(!dragTaskId||dragTaskId===toTid)return;
-  const p=getP(selId);if(!p)return;
-  const order=[...taskIds];
-  const fromIdx=order.indexOf(dragTaskId);
-  const toIdx=order.indexOf(toTid);
-  if(fromIdx<0||toIdx<0)return;
-  order.splice(toIdx,0,order.splice(fromIdx,1)[0]);
-  const to={...(p.taskOrder||{})};
-  if(!to[stageId])to[stageId]={};
-  to[stageId][sectionS]=order;
-  setP(selId,{taskOrder:to});renderCheck();
-}
+// dropOnDefaultTask: merged into dropOnAnyTask
 
 
 const INIT=[
@@ -4046,6 +4058,8 @@ function renderCheck(){
     orderedTasks.forEach(task=>{
       h+=renderTaskRow(p,task.id,{...task,tx:(p.taskText||{})[task.id]||task.tx},false,active,sec.s,taskIds);
     });
+    // Store task IDs for drag-drop (global store approach)
+    _sectionTaskIds[active+'|||'+sec.s]=taskIds;
     h+=`</div>`;
   });
 
@@ -4057,6 +4071,8 @@ function renderCheck(){
     customByStage.forEach(ct=>{
       h+=renderTaskRow(p,ct.tid,{id:ct.tid,tx:ct.tx,info:null,links:[]},true,active,'__custom__',[]);
     });
+    // Store custom task IDs for drag-drop
+    _sectionTaskIds[active+'|||__custom__']=customByStage.map(ct=>ct.tid);
     h+=`</div>`;
   }
 
@@ -4084,14 +4100,18 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   const due=(p.taskDates||{})[tid]||"";
   const hasDue=!!due;
   const hasRef=!!((p.taskLinks||{})[tid]?.length||(p.taskAttachments||{})[tid]?.length);
+  const isRecur=(p.taskRecurrence||{})[tid];
+  const sectionKey=activeStage+'|||'+(sectionS||'__custom__');
+
   let h=`<div class="clt${dis?" dis":""}" id="clt-${tid}"
+    data-tid="${tid}" data-stage="${activeStage}" data-skey="${sectionKey}"
     draggable="true"
     ondragstart="startDragTask(event,'${tid}','${activeStage}')"
     ondragend="endDragTask(event)"
-    ondragover="${isCustom?`dragOverTask(event,'${tid}','${activeStage}')`:`dragOverTask(event,'${tid}','${activeStage}')`}"
-    ondrop="${isCustom?`dropOnTask(event,'${tid}','${activeStage}')`:`dropOnDefaultTask(event,'${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}',${JSON.stringify(taskIds||[])})`}">
+    ondragover="dragOverTask(event,'${tid}','${activeStage}')"
+    ondrop="dropOnAnyTask(event,'${tid}','${activeStage}','${sectionKey}')">
     <div class="clt-main">
-      <span style="cursor:grab;color:#283548;font-size:12px;flex-shrink:0" title="Arrastar para reordenar">⠿</span>
+      <span style="cursor:grab;color:#283548;font-size:12px;flex-shrink:0;user-select:none" title="Arrastar">⠿</span>
       <input type="checkbox" class="clt-chk" id="ck-${tid}" ${chk?"checked":""} ${dis?"disabled":""}
              onchange="toggleCk('${tid}',this.checked,'${activeStage}')">`;
   if(isEditing){
@@ -4102,34 +4122,25 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   }
   h+=`<div class="clt-btns">`;
   if(!isEditing){
-    if(isCustom) h+=`<span draggable="true" class="drag-handle" title="Arrastar"
-      ondragstart="startDragTask(event,'${tid}','${activeStage}')"
-      ondragend="endDragTask(event)"
-      ondragover="dragOverTask(event,'${tid}','${activeStage}')"
-      ondrop="dropOnTask(event,'${tid}','${activeStage}')"
-      style="cursor:grab;color:#334155;font-size:13px;padding:0 2px;user-select:none">⠿</span>`;
     if(hasDetail) h+=`<button class="expand-btn" onclick="toggleExp('${tid}')">${exp?"▴":"▾"}</button>`;
-    if(isCustom){
-      const isRecur=(p.taskRecurrence||{})[tid];
-      h+=`<select onchange="setTaskRecurrence('${tid}',this.value)"
-        style="font-size:9px;background:#0f1e2e;border:1px solid rgba(71,85,105,.2);color:${isRecur?'#818cf8':'#334155'};border-radius:3px;padding:1px 3px;cursor:pointer" title="Recorrência">
-        <option value="" ${!isRecur?'selected':''}>1x</option>
-        <option value="daily" ${isRecur==='daily'?'selected':''}>🔁 D</option>
-        <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
-        <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
-      </select>`;
-      h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>`;
-    }
+    // Recorrência — disponível para TODAS as tarefas
+    h+=`<select onchange="setTaskRecurrence('${tid}',this.value)"
+      style="font-size:9px;background:#0f1e2e;border:1px solid rgba(71,85,105,.2);color:${isRecur?'#818cf8':'#334155'};border-radius:3px;padding:1px 3px;cursor:pointer;max-width:52px" title="Recorrência">
+      <option value="" ${!isRecur?'selected':''}>1x</option>
+      <option value="daily" ${isRecur==='daily'?'selected':''}>🔁 D</option>
+      <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
+      <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
+    </select>`;
+    if(isCustom) h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>`;
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
-    if(!isEditing) h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
+    h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
     h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
-      style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:12px;padding:2px 3px">${hasRef?'📎':'📎'}</button>`;
+      style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:12px;padding:2px 3px">📎</button>`;
   } else {
     h+=`<button class="add-task-ok" style="font-size:10px;padding:2px 7px" onclick="saveTaskText('${tid}','${activeStage}',${isCustom})">✓</button>`;
     h+=`<button class="add-task-x" style="font-size:10px;padding:2px 6px" onclick="cancelEditTask()">✕</button>`;
   }
   h+=`</div></div>`;
-  // reminder row — hidden by default, toggle on bell click
   h+=`<div class="task-remind-expand" id="remind-${tid}">
     <input class="task-due-inp" type="datetime-local" value="${due}" onchange="setTaskDue('${tid}','${activeStage}',this.value)">
     ${hasDue?`<button onclick="setTaskDue('${tid}','${activeStage}','')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;margin-top:3px">✕ Remover lembrete</button>`:""}
