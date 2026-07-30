@@ -3369,6 +3369,191 @@ function applyTaskOrder(tasks,order){
 // dropOnDefaultTask: merged into dropOnAnyTask
 
 
+/* ── BUILD INFO HISTORY (Projeto/Pod autocomplete) ──────── */
+function getBuildHistory(){ return lsGet('buildHistory')||{projetos:[],pods:[]}; }
+function recordBuildValue(tipo,val){
+  if(!val||!val.trim())return;
+  val=val.trim();
+  const h=getBuildHistory();
+  if(!h[tipo])h[tipo]=[];
+  h[tipo]=[val,...h[tipo].filter(v=>v!==val)].slice(0,25);
+  lsSet('buildHistory',h);
+  sbSet('buildHistory',h).catch(()=>{});
+}
+
+function renderBuildInfo(){
+  const p=getP(selId);if(!p)return'';
+  const stageIdx=STAGES.findIndex(s=>s.id===p.stage);
+  const homologIdx=STAGES.findIndex(s=>s.id==='homolog');
+  if(stageIdx<homologIdx)return'';
+  const builds=p.builds||[{projeto:'',pod:'',build:''}];
+  const h=getBuildHistory();
+  const projs=(h.projetos||[]).map(v=>`<option value="${v}">`).join('');
+  const pods=(h.pods||[]).map(v=>`<option value="${v}">`).join('');
+  let html=`<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(71,85,105,.2)">
+    <datalist id="build-proj-list">${projs}</datalist>
+    <datalist id="build-pod-list">${pods}</datalist>
+    <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      🏗 Build Info
+      <button onclick="addBuildRow()" style="background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:2px 10px;border-radius:4px;font-size:10px;cursor:pointer">+ Add</button>
+    </div>
+    <div style="font-size:9px;color:#475569;display:grid;grid-template-columns:1fr 1fr 1fr 22px;gap:4px;margin-bottom:4px;padding:0 2px">
+      <span>Projeto</span><span>Pod</span><span>Build</span><span></span>
+    </div>`;
+  builds.forEach((b,i)=>{
+    html+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 22px;gap:4px;margin-bottom:5px">
+      <input class="mef-inp" list="build-proj-list" style="padding:5px 7px;font-size:11px" value="${b.projeto||''}" placeholder="Projeto"
+        onchange="updateBuild(${i},'projeto',this.value);recordBuildValue('projetos',this.value)">
+      <input class="mef-inp" list="build-pod-list" style="padding:5px 7px;font-size:11px" value="${b.pod||''}" placeholder="Pod"
+        onchange="updateBuild(${i},'pod',this.value);recordBuildValue('pods',this.value)">
+      <input class="mef-inp" style="padding:5px 7px;font-size:11px" value="${b.build||''}" placeholder="Build #"
+        onchange="updateBuild(${i},'build',this.value)">
+      <button onclick="removeBuildRow(${i})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:14px;padding:0">×</button>
+    </div>`;
+  });
+  return html+`</div>`;
+}
+
+/* ── TASK REFS PANEL v2 ─────────────────────────────────── */
+// renderTaskRef v2 defined above
+
+function filterTaskRefAC(tid,q){
+  const drop=document.getElementById('trl-ac-'+tid);
+  if(!drop)return;
+  if(!q||q.length<1){drop.style.display='none';return;}
+  const matches=getSystems().filter(s=>
+    s.name.toLowerCase().includes(q.toLowerCase())||
+    (s.url||'').toLowerCase().includes(q.toLowerCase())
+  ).slice(0,6);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(s=>
+    `<div onmousedown="taskRefPickSys('${tid}','${s.name.replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}')"
+      style="padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:10px;color:#e2e8f0;border-bottom:1px solid rgba(71,85,105,.1)"
+      onmouseover="this.style.background='rgba(6,182,212,.1)'" onmouseout="this.style.background=''">
+      <span>${s.icon||'🔗'}</span><span>${s.name}</span>
+      <span style="color:#475569;margin-left:auto;font-size:9px">${(s.url||'').substring(0,25)+'…'}</span>
+    </div>`
+  ).join('');
+  drop.style.display='block';
+}
+function closeTaskRefAC(tid){
+  const drop=document.getElementById('trl-ac-'+tid);
+  if(drop)drop.style.display='none';
+}
+function taskRefPickSys(tid,name,url){
+  const ni=document.getElementById('trl-name-'+tid);
+  const ui=document.getElementById('trl-url-'+tid);
+  if(ni)ni.value=name;
+  if(ui)ui.value=url;
+  closeTaskRefAC(tid);
+}
+
+// Edit task link (default or user)
+function editTaskLink(tid,allIdx,isDefault,srcIdx){
+  const p=getP(selId);if(!p)return;
+  if(isDefault){
+    const task=findTaskInCL(tid);
+    const orig=task?.links?.[srcIdx]||{n:'',u:''};
+    const newName=prompt('Nome do link:',orig.n)||orig.n;
+    const newUrl=prompt('URL:',orig.u)||orig.u;
+    const edits={...(p.taskLinkEdits||{})};
+    if(!edits[tid])edits[tid]={};
+    edits[tid][srcIdx]={name:newName,url:newUrl};
+    setP(selId,{taskLinkEdits:edits});
+  } else {
+    const links=[...(p.taskLinks||{})[tid]||[]];
+    const orig=links[srcIdx]||{name:'',url:''};
+    const newName=prompt('Nome do link:',orig.name)||orig.name;
+    const newUrl=prompt('URL:',orig.url)||orig.url;
+    links[srcIdx]={name:newName,url:newUrl};
+    setP(selId,{taskLinks:{...(p.taskLinks||{}),[tid]:links}});
+  }
+  renderCheck();
+}
+
+function findTaskInCL(tid){
+  for(const stageId of Object.keys(CL)){
+    for(const sec of CL[stageId]){
+      const t=sec.t?.find(t=>t.id===tid);
+      if(t)return t;
+    }
+  }
+  return null;
+}
+
+/* ── TEMPLATES WITH ATTACHMENTS ─────────────────────────── */
+function openTplModal(i){
+  const items=getTemplates();
+  const t=items[i];if(!t)return;
+  const bg=document.createElement('div');
+  bg.className='modal-bg open';bg.style.zIndex='500';
+  const attaches=t.attachments||[];
+  const attachHtml=attaches.map((a,ai)=>
+    `<a href="${a.data}" download="${a.name}"
+      style="display:inline-flex;align-items:center;gap:4px;color:#38bdf8;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);padding:3px 10px;border-radius:5px;text-decoration:none;font-size:10px;margin:2px">
+      📎 ${a.name}
+      <span onclick="event.preventDefault();removeTplAttach(${i},${ai},this)" style="color:#475569;cursor:pointer">×</span>
+    </a>`
+  ).join('');
+  bg.innerHTML=`<div class="modal" style="max-width:560px">
+    <div class="mhd"><div class="mhd-top">
+      <div><div class="mname" style="font-size:14px">${t.name}</div><div style="font-size:11px;color:#64748b">${t.desc}</div></div>
+      <button class="close-btn" onclick="this.closest('.modal-bg').remove()">×</button>
+    </div></div>
+    <div class="mbody">
+      <textarea class="ea" rows="16" id="tplTa" style="font-family:monospace;font-size:11px;border-radius:6px;border:1px solid rgba(71,85,105,.3)">${t.body}</textarea>
+      <button class="btn-s" style="margin-top:8px;width:100%" onclick="copyClip(document.getElementById('tplTa').value);this.textContent='✅ Copiado!';setTimeout(()=>this.textContent='📋 Copiar',2000)">📋 Copiar</button>
+      <div style="margin-top:10px;border-top:1px solid rgba(71,85,105,.2);padding-top:10px">
+        <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">📎 Anexos do template</div>
+        <div id="tpl-attach-${i}" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${attachHtml}</div>
+        <button onclick="openTplFilePicker(${i})" style="background:none;border:1px dashed rgba(71,85,105,.3);color:#64748b;padding:5px 14px;border-radius:5px;font-size:10px;cursor:pointer;width:100%">
+          📁 Anexar arquivo ao template (máx 500KB)
+        </button>
+      </div>
+    </div></div>`;
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});
+  document.body.appendChild(bg);
+}
+
+function openTplFilePicker(tplIdx){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*,.pdf,.doc,.docx,.xlsx,.txt';
+  inp.onchange=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    if(file.size>500*1024){showToast('Arquivo grande','Limite: 500KB');return;}
+    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+    const arr=[...getTemplates()];
+    arr[tplIdx].attachments=[...(arr[tplIdx].attachments||[]),{name:file.name,type:file.type,data:b64}];
+    saveMenuData('templates',arr).then(()=>{
+      showToast('✅ Anexo adicionado',file.name);
+      // Update display in open modal
+      const container=document.getElementById('tpl-attach-'+tplIdx);
+      if(container){
+        const a=arr[tplIdx].attachments;
+        const last=a[a.length-1];
+        const ai=a.length-1;
+        const el=document.createElement('span');
+        el.innerHTML=`<a href="${last.data}" download="${last.name}"
+          style="display:inline-flex;align-items:center;gap:4px;color:#38bdf8;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);padding:3px 10px;border-radius:5px;text-decoration:none;font-size:10px;margin:2px">
+          📎 ${last.name}
+          <span onclick="event.preventDefault();removeTplAttach(${tplIdx},${ai},this)" style="color:#475569;cursor:pointer">×</span>
+        </a>`;
+        container.appendChild(el.firstChild);
+      }
+    });
+  };
+  inp.click();
+}
+
+function removeTplAttach(tplIdx,ai,el){
+  const arr=[...getTemplates()];
+  arr[tplIdx].attachments=(arr[tplIdx].attachments||[]).filter((_,i)=>i!==ai);
+  saveMenuData('templates',arr);
+  el?.closest('a')?.remove();
+  showToast('🗑 Anexo removido','');
+}
+
+
 const INIT=[
   {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Bruno Granito",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
    desc:"Feature de exibição do Valor Investido (preço médio) para ativos de RV em custódia. Cobre 3 cenários: (1) Ativo de IPO — preço de custo via CRCA, preço de mercado via backoffice; (2) Ativo Lockup sem cotação — preço manual do backoffice; (3) Ativo já negociado B3 — liquidadas usam accepted booking, não-liquidadas usam bucket. Inclui reprocessamento diário de posições.",
@@ -4101,6 +4286,8 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
   const hasDue=!!due;
   const hasRef=!!((p.taskLinks||{})[tid]?.length||(p.taskAttachments||{})[tid]?.length);
   const isRecur=(p.taskRecurrence||{})[tid];
+  const defaultLinks=task?.links||[];
+  const totalRefs=((p.taskLinks||{})[tid]?.length||0)+((p.taskAttachments||{})[tid]?.length||0)+defaultLinks.length;
   const sectionKey=activeStage+'|||'+(sectionS||'__custom__');
 
   let h=`<div class="clt${dis?" dis":""}" id="clt-${tid}"
@@ -4135,7 +4322,9 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
     h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
     h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
-      style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:12px;padding:2px 3px">📎</button>`;
+      style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:12px;padding:2px 3px;position:relative">
+      📎${totalRefs>0?`<span style="font-size:8px;color:${hasRef?'#38bdf8':'#475569'};vertical-align:super;margin-left:1px">${totalRefs}</span>`:''}
+    </button>`;
   } else {
     h+=`<button class="add-task-ok" style="font-size:10px;padding:2px 7px" onclick="saveTaskText('${tid}','${activeStage}',${isCustom})">✓</button>`;
     h+=`<button class="add-task-x" style="font-size:10px;padding:2px 6px" onclick="cancelEditTask()">✕</button>`;
@@ -4145,7 +4334,7 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
     <input class="task-due-inp" type="datetime-local" value="${due}" onchange="setTaskDue('${tid}','${activeStage}',this.value)">
     ${hasDue?`<button onclick="setTaskDue('${tid}','${activeStage}','')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;margin-top:3px">✕ Remover lembrete</button>`:""}
   </div>`;
-  h+=renderTaskRef(p,tid);
+  h+=renderTaskRef(p,tid,task);
   // expanded detail
   if(exp&&hasDetail){
     h+=`<div class="clt-detail">`;
