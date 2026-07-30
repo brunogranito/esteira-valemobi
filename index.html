@@ -4956,18 +4956,11 @@ async function initApp(){
   setInterval(checkReminders,60000);
 }
 
-/* ── BOOTSTRAP ── check session or show login ─── */
-// Migra sessão antiga de Charles para Bruno Granito
-(()=>{
-  const sess=lsGet('session');
-  if(sess&&(sess.name==='Charles'||sess.email==='charles@valemobi')){
-    sess.name='Bruno Granito';sess.email='bruno.granito@valemobi';sess.id='bruno';
-    lsSet('session',sess);
-  }
-})();
-if(!checkSession()){
-  document.getElementById('loginScreen')?.style.display && (document.getElementById('loginScreen').style.display='flex');
-}
+/* ── BOOTSTRAP — inicia direto, sem login ─── */
+currentUser={id:'bruno',email:'bruno.granito@valemobi',name:'Bruno Granito',role:'user'};
+lsSet('session',currentUser);
+updateSidebarUser(currentUser);
+initApp();
 </script>
 </body>
 </html>
