@@ -4235,8 +4235,10 @@ function renderCheck(){
     const done=notDis.filter(t=>(p.checks||{})[t.id]).length;
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
     // Apply custom order to default tasks + inject permanent + injected tasks
+    const taskOrder=getTaskOrder(p,active,sec.s);
+    const orderedTasks=applyTaskOrder(tasks,taskOrder);
     const permanentInSec=(getPermanentTasks()[active]||[]).filter(t=>t.sectionS===sec.s);
-    const injectedInSec=((getP(selId)?.injectedTasks||{})[active]?.[sec.s]||[]);
+    const injectedInSec=((p.injectedTasks||{})[active]?.[sec.s]||[]);
     const allSecTasks=[...orderedTasks,...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))];
     const taskIds=allSecTasks.map(t=>t.id);
     // Store for drag-drop
@@ -4252,8 +4254,10 @@ function renderCheck(){
       </div>
     </div>`;
     allSecTasks.forEach(task=>{
-      const isExtra=task.isPermanent||task.isInjected;
-      h+=renderTaskRow(p,task.id,task,isExtra,active,sec.s,taskIds);
+      const isExtra=!!(task.isPermanent||task.isInjected);
+      const fullTask=isExtra?{id:task.id,tx:task.tx,info:null,links:[]}:
+                              {...task,tx:(p.taskText||{})[task.id]||task.tx};
+      h+=renderTaskRow(p,task.id,fullTask,isExtra,active,sec.s,taskIds);
     });
     h+=`</div>`;
   });
