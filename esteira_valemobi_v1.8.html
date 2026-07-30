@@ -4947,12 +4947,19 @@ async function initApp(){
 
 /* ── BOOTSTRAP — inicia direto, sem login ─── */
 (()=>{
+  // Esconde login se existir
   const ls=document.getElementById('loginScreen');
   if(ls) ls.style.display='none';
+  // Atualiza sidebar
+  const av=document.getElementById('sbAvatar');
+  const nm=document.getElementById('sbUname');
+  const rl=document.getElementById('sbUrole');
+  if(av) av.textContent='B';
+  if(nm) nm.textContent='Bruno Granito';
+  if(rl) rl.textContent='QA · RV';
 })();
 currentUser={id:'bruno',email:'bruno.granito@valemobi',name:'Bruno Granito',role:'user'};
 lsSet('session',currentUser);
-updateSidebarUser(currentUser);
 initApp();
 </script>
 </body>
