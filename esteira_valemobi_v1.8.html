@@ -587,6 +587,31 @@ body.light .paci-name{color:#1e293b}
 .reminder-dismiss{background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 .reminder-open{background:linear-gradient(90deg,#06b6d4,#14b8a6);border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 
+
+/* ── TASKS PANEL ──────────────────────────────────────── */
+.tp-section{margin-bottom:10px}
+.tp-sec-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(6,182,212,.08);border-radius:8px;cursor:pointer;user-select:none;border:1px solid rgba(6,182,212,.15)}
+.tp-sec-hd:hover{background:rgba(6,182,212,.14)}
+.tp-sec-title{font-size:12px;font-weight:700;color:#e2e8f0;display:flex;align-items:center;gap:7px}
+.tp-sec-badge{background:rgba(6,182,212,.2);color:#38bdf8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.tp-card-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-top:7px;background:rgba(15,23,42,.5);border-radius:7px;cursor:pointer;user-select:none;border:1px solid rgba(71,85,105,.2)}
+.tp-card-hd:hover{background:rgba(15,23,42,.8)}
+.tp-card-name{font-size:11px;font-weight:600;color:#cbd5e1;display:flex;align-items:center;gap:6px}
+.tp-card-badge{font-size:9px;color:#64748b;padding:1px 6px;border-radius:8px;background:rgba(71,85,105,.2)}
+.tp-tasks{padding:4px 4px 4px 12px}
+.tp-task-row{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:5px;transition:background .12s}
+.tp-task-row:hover{background:rgba(71,85,105,.12)}
+.tp-task-cb{margin-top:2px;accent-color:#06b6d4;cursor:pointer;flex-shrink:0}
+.tp-task-txt{font-size:11px;color:#94a3b8;line-height:1.4;cursor:pointer}
+.tp-task-txt.done{color:#334155;text-decoration:line-through}
+.tp-open-card{background:none;border:none;color:#475569;cursor:pointer;font-size:10px;padding:0 2px;flex-shrink:0;margin-top:2px}
+.tp-open-card:hover{color:#06b6d4}
+.tp-standalone-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:5px}
+.tp-standalone-row:hover{background:rgba(71,85,105,.1)}
+.tp-standalone-inp{flex:1;background:rgba(15,23,42,.7);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:7px 10px;border-radius:6px;font-size:11px;outline:none}
+.tp-standalone-inp:focus{border-color:#06b6d4}
+.tp-add-btn{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:7px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;flex-shrink:0}
+
 </style>
 </head>
 <body>
@@ -660,6 +685,7 @@ body.light .paci-name{color:#1e293b}
   <nav class="sb-nav">
     <div class="sb-section">Principal</div>
     <div class="sb-item" onclick="openBriefing();closeSidebar()"><span class="sb-item-icon">☀️</span>Briefing do Dia</div>
+    <div class="sb-item" onclick="openTasksPanel();closeSidebar()"><span class="sb-item-icon">📋</span>Tarefas</div>
     <div class="sb-item" onclick="openAgenda();closeSidebar()"><span class="sb-item-icon">📅</span>Agenda</div>
     <div class="sb-item" onclick="openReportsPanel();closeSidebar()"><span class="sb-item-icon">📊</span>Relatórios</div>
     <div class="sb-section">Integrações</div>
@@ -879,6 +905,18 @@ body.light .paci-name{color:#1e293b}
       <button class="reminder-dismiss" onclick="dismissReminderAlert()">✓ Dispensar</button>
       <button class="reminder-open" id="reminderAlertOpen">Abrir card →</button>
     </div>
+  </div>
+</div>
+
+<!-- TASKS PANEL -->
+<div class="panel-overlay" id="tasksPanelOverlay" onclick="if(event.target===this)closeTasksPanel()" style="align-items:stretch;justify-content:flex-end">
+  <div style="width:min(480px,100vw);height:100vh;background:#0c1829;display:flex;flex-direction:column;border-left:1px solid rgba(71,85,105,.3);box-shadow:-4px 0 24px rgba(0,0,0,.5)">
+    <div class="panel-hd" style="flex-shrink:0">
+      <div><div class="panel-title">📋 Tarefas</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Visão unificada de todas as tarefas</div></div>
+      <button class="close-btn" onclick="closeTasksPanel()">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 16px" id="tasksPanelBody"></div>
   </div>
 </div>
 
@@ -2896,7 +2934,24 @@ function showReminderAlert(project, text, pid, tid){
   if(!el)return;
   if(proj) proj.textContent=project;
   if(txt) txt.textContent=text;
-  if(btn) btn.onclick=()=>{dismissReminderAlert();openModal(pid);};
+  if(btn) btn.onclick=()=>{
+    dismissReminderAlert();
+    openModal(pid);
+    // Navigate to Checklist and scroll to the specific task
+    setTimeout(()=>{
+      sw('check');
+      setTimeout(()=>{
+        const el=document.getElementById('clt-'+tid);
+        if(el){
+          el.scrollIntoView({behavior:'smooth',block:'center'});
+          el.style.transition='background .3s';
+          el.style.background='rgba(251,191,36,.2)';
+          el.style.borderRadius='6px';
+          setTimeout(()=>{el.style.background='';},2500);
+        }
+      },200);
+    },80);
+  };
   pendingReminderAlert={pid,tid};
   el.classList.add('show');
   // Play a subtle sound if possible
@@ -3547,6 +3602,185 @@ function promoteTaskToDefault(tid,stageId,sectionS){
 // ── Cross-section drag e reordenamento: tratado em dropOnAnyTask acima ──
 
 
+
+
+/* ── TASKS PANEL ─────────────────────────────────────────── */
+let _tpExpanded={sec1:true,sec2:true}; // section expand state
+const _tpCards={}; // card expand state per card id
+
+function openTasksPanel(){
+  document.getElementById('tasksPanelOverlay').classList.add('open');
+  renderTasksPanel();
+}
+function closeTasksPanel(){
+  document.getElementById('tasksPanelOverlay').classList.remove('open');
+}
+
+function toggleTpSection(sec){
+  _tpExpanded[sec]=!_tpExpanded[sec];
+  renderTasksPanel();
+}
+function toggleTpCard(pid){
+  _tpCards[pid]=!(_tpCards[pid]??true);
+  renderTasksPanel();
+}
+
+function getCardStageTasks(p){
+  const clS=CL[p.stage]||[];
+  const defs=clS.flatMap(s=>s.t||[]).filter(t=>!(p.dis||{})[t.id]);
+  const custom=(p.customTasks||{})[p.stage]||[];
+  const perma=(getPermanentTasks()[p.stage]||[]);
+  return [...defs,...custom.map(ct=>({id:ct.tid,tx:ct.tx})),...perma.map(pt=>({id:pt.tid,tx:pt.tx}))];
+}
+
+function toggleCardTaskInPanel(pid,tid,val){
+  const p=getP(pid);if(!p)return;
+  const recur=(p.taskRecurrence||{})[tid];
+  if(val&&recur){
+    const next=getNextOccurrence(new Date(),recur);
+    showToast(`🔁 ${RECUR_LABELS[recur]}`,`Próxima: ${next.toLocaleDateString('pt-BR')}`);
+  }
+  setP(pid,{checks:{...(p.checks||{}),[tid]:val}});
+  refreshProgress(pid);
+  renderTasksPanel();
+  renderBoard();renderStats();
+}
+
+function openCardAtTask(pid,tid){
+  closeTasksPanel();
+  openModal(pid);
+  setTimeout(()=>{
+    sw('check');
+    setTimeout(()=>{
+      const el=document.getElementById('clt-'+tid);
+      if(el){
+        el.scrollIntoView({behavior:'smooth',block:'center'});
+        el.style.transition='background .3s';
+        el.style.background='rgba(6,182,212,.15)';
+        setTimeout(()=>{el.style.background='';},2000);
+      }
+    },200);
+  },80);
+}
+
+// Standalone tasks
+function getStandaloneTasks(){ return lsGet('standaloneTasks')||[]; }
+function saveStandaloneTasks(arr){ lsSet('standaloneTasks',arr); sbSet('standaloneTasks',arr).catch(()=>{}); }
+
+function addStandaloneTask(){
+  const inp=document.getElementById('tpStandaloneInp');
+  const txt=(inp?.value||'').trim();
+  if(!txt)return;
+  const tasks=[...getStandaloneTasks(),{id:'st_'+Date.now(),tx:txt,done:false,createdAt:new Date().toISOString()}];
+  saveStandaloneTasks(tasks);
+  if(inp)inp.value='';
+  renderTasksPanel();
+}
+function toggleStandaloneTask(id,val){
+  const tasks=getStandaloneTasks().map(t=>t.id===id?{...t,done:val}:t);
+  saveStandaloneTasks(tasks);
+  renderTasksPanel();
+}
+function deleteStandaloneTask(id){
+  saveStandaloneTasks(getStandaloneTasks().filter(t=>t.id!==id));
+  renderTasksPanel();
+}
+
+function renderTasksPanel(){
+  const body=document.getElementById('tasksPanelBody');
+  if(!body)return;
+  const active=projects.filter(p=>!p.archived);
+  const standalone=getStandaloneTasks();
+  const st=STAGES;
+
+  // ── Section 1: Tarefas dos Cards ──────────────────────────
+  const sec1open=_tpExpanded.sec1!==false;
+  let totalPend=0;
+  active.forEach(p=>{
+    const tasks=getCardStageTasks(p);
+    totalPend+=tasks.filter(t=>!(p.checks||{})[t.id]).length;
+  });
+
+  let h=`<div class="tp-section">
+    <div class="tp-sec-hd" onclick="toggleTpSection('sec1')">
+      <div class="tp-sec-title">${sec1open?'▼':'▶'} 📌 Tarefas dos Cards</div>
+      <span class="tp-sec-badge">${totalPend} pendentes</span>
+    </div>`;
+
+  if(sec1open){
+    active.forEach(p=>{
+      const tasks=getCardStageTasks(p);
+      if(!tasks.length)return;
+      const done=tasks.filter(t=>(p.checks||{})[t.id]).length;
+      const pend=tasks.length-done;
+      const cardOpen=_tpCards[p.id]!==false; // default open
+      const stageInfo=st.find(s=>s.id===p.stage);
+      h+=`<div class="tp-card-hd" onclick="toggleTpCard('${p.id}')">
+        <div class="tp-card-name">
+          ${cardOpen?'▼':'▶'}
+          <span style="font-size:10px">${stageInfo?.icon||''}</span>
+          ${p.name}
+          <span style="color:#475569;font-size:9px">${p.code}</span>
+        </div>
+        <span class="tp-card-badge" style="color:${pend>0?'#fbbf24':'#10b981'}">${done}/${tasks.length} ✓</span>
+      </div>`;
+      if(cardOpen){
+        h+=`<div class="tp-tasks">`;
+        tasks.forEach(t=>{
+          const tid=t.id||t.tid;
+          const isDone=!!(p.checks||{})[tid];
+          const isRecur=!!(p.taskRecurrence||{})[tid];
+          h+=`<div class="tp-task-row">
+            <input type="checkbox" class="tp-task-cb" ${isDone?'checked':''}
+              onchange="toggleCardTaskInPanel('${p.id}','${tid}',this.checked)">
+            <span class="tp-task-txt${isDone?' done':''}" onclick="openCardAtTask('${p.id}','${tid}')">${t.tx||t.id}${isRecur?' 🔁':''}</span>
+            <button class="tp-open-card" onclick="openCardAtTask('${p.id}','${tid}')" title="Abrir no card">↗</button>
+          </div>`;
+        });
+        h+=`</div>`;
+      }
+    });
+    if(!active.length) h+=`<div style="font-size:11px;color:#334155;padding:14px;text-align:center">Nenhuma demanda ativa.</div>`;
+  }
+  h+=`</div>`;
+
+  // ── Section 2: Tarefas Avulsas ────────────────────────────
+  const sec2open=_tpExpanded.sec2!==false;
+  const stPend=standalone.filter(t=>!t.done).length;
+
+  h+=`<div class="tp-section">
+    <div class="tp-sec-hd" onclick="toggleTpSection('sec2')">
+      <div class="tp-sec-title">${sec2open?'▼':'▶'} 🗒 Tarefas Avulsas</div>
+      <span class="tp-sec-badge">${stPend} pendentes</span>
+    </div>`;
+
+  if(sec2open){
+    h+=`<div class="tp-tasks" style="padding-top:10px">
+      <div style="display:flex;gap:7px;margin-bottom:12px">
+        <input id="tpStandaloneInp" class="tp-standalone-inp" placeholder="Nova tarefa avulsa…"
+          onkeydown="if(event.key==='Enter')addStandaloneTask()">
+        <button class="tp-add-btn" onclick="addStandaloneTask()">+ Add</button>
+      </div>`;
+    if(!standalone.length){
+      h+=`<div style="font-size:11px;color:#334155;padding:8px;text-align:center">Nenhuma tarefa avulsa cadastrada.</div>`;
+    } else {
+      standalone.forEach(t=>{
+        h+=`<div class="tp-standalone-row">
+          <input type="checkbox" class="tp-task-cb" ${t.done?'checked':''}
+            onchange="toggleStandaloneTask('${t.id}',this.checked)">
+          <span class="tp-task-txt${t.done?' done':''}" style="flex:1">${t.tx}</span>
+          <button onclick="deleteStandaloneTask('${t.id}')"
+            style="background:none;border:none;color:#334155;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0"
+            title="Remover">🗑</button>
+        </div>`;
+      });
+    }
+    h+=`</div>`;
+  }
+  h+=`</div>`;
+
+  body.innerHTML=h;
+}
 
 
 const INIT=[
@@ -4934,6 +5168,31 @@ body.light .paci-name{color:#1e293b}
 .reminder-btns{display:flex;gap:10px;justify-content:center}
 .reminder-dismiss{background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);color:#fbbf24;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
 .reminder-open{background:linear-gradient(90deg,#06b6d4,#14b8a6);border:none;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+
+
+/* ── TASKS PANEL ──────────────────────────────────────── */
+.tp-section{margin-bottom:10px}
+.tp-sec-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(6,182,212,.08);border-radius:8px;cursor:pointer;user-select:none;border:1px solid rgba(6,182,212,.15)}
+.tp-sec-hd:hover{background:rgba(6,182,212,.14)}
+.tp-sec-title{font-size:12px;font-weight:700;color:#e2e8f0;display:flex;align-items:center;gap:7px}
+.tp-sec-badge{background:rgba(6,182,212,.2);color:#38bdf8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.tp-card-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-top:7px;background:rgba(15,23,42,.5);border-radius:7px;cursor:pointer;user-select:none;border:1px solid rgba(71,85,105,.2)}
+.tp-card-hd:hover{background:rgba(15,23,42,.8)}
+.tp-card-name{font-size:11px;font-weight:600;color:#cbd5e1;display:flex;align-items:center;gap:6px}
+.tp-card-badge{font-size:9px;color:#64748b;padding:1px 6px;border-radius:8px;background:rgba(71,85,105,.2)}
+.tp-tasks{padding:4px 4px 4px 12px}
+.tp-task-row{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:5px;transition:background .12s}
+.tp-task-row:hover{background:rgba(71,85,105,.12)}
+.tp-task-cb{margin-top:2px;accent-color:#06b6d4;cursor:pointer;flex-shrink:0}
+.tp-task-txt{font-size:11px;color:#94a3b8;line-height:1.4;cursor:pointer}
+.tp-task-txt.done{color:#334155;text-decoration:line-through}
+.tp-open-card{background:none;border:none;color:#475569;cursor:pointer;font-size:10px;padding:0 2px;flex-shrink:0;margin-top:2px}
+.tp-open-card:hover{color:#06b6d4}
+.tp-standalone-row{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:5px}
+.tp-standalone-row:hover{background:rgba(71,85,105,.1)}
+.tp-standalone-inp{flex:1;background:rgba(15,23,42,.7);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:7px 10px;border-radius:6px;font-size:11px;outline:none}
+.tp-standalone-inp:focus{border-color:#06b6d4}
+.tp-add-btn{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);color:#38bdf8;padding:7px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;flex-shrink:0}
 
 </style></head><body>
   <div class="cover">
