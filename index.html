@@ -3022,6 +3022,16 @@ function checkReminders(){
     });
   });
 
+  // Tarefas avulsas com lembrete
+  getStandaloneTasks().filter(t=>!t.done&&t.dueDate&&!t.notified).forEach(t=>{
+    if(new Date(t.dueDate)<=now){
+      saveStandaloneTasks(getStandaloneTasks().map(st=>st.id===t.id?{...st,notified:true}:st));
+      showReminderAlert('Tarefa Avulsa',t.tx,'__standalone__',t.id);
+      try{fireBrowserNotif('Tarefa Avulsa',t.tx);}catch(e){}
+      overdueCount++;
+    }
+  });
+
   updateBell(overdueCount);
 }
 
@@ -3605,7 +3615,7 @@ function promoteTaskToDefault(tid,stageId,sectionS){
 
 
 /* ── TASKS PANEL ─────────────────────────────────────────── */
-let _tpExpanded={sec1:true,sec2:true}; // section expand state
+let _tpExpanded={sec1:false,sec2:false}; // section expand state — recolhido por padrão
 const _tpCards={}; // card expand state per card id
 
 function openTasksPanel(){
@@ -3710,7 +3720,7 @@ function renderTasksPanel(){
       if(!tasks.length)return;
       const done=tasks.filter(t=>(p.checks||{})[t.id]).length;
       const pend=tasks.length-done;
-      const cardOpen=_tpCards[p.id]!==false; // default open
+      const cardOpen=_tpCards[p.id]===true; // default collapsed
       const stageInfo=st.find(s=>s.id===p.stage);
       h+=`<div class="tp-card-hd" onclick="toggleTpCard('${p.id}')">
         <div class="tp-card-name">
@@ -3943,20 +3953,6 @@ function toggleStandaloneTask(id,val){
   renderTasksPanel();
 }
 
-// Extend checkReminders for standalone task reminders
-const _baseCheckReminders=checkReminders;
-function checkReminders(){
-  _baseCheckReminders();
-  // Also check standalone tasks
-  const now=new Date();
-  getStandaloneTasks().filter(t=>!t.done&&t.dueDate&&!t.notified).forEach(t=>{
-    if(new Date(t.dueDate)<=now){
-      saveStandaloneTasks(getStandaloneTasks().map(st=>st.id===t.id?{...st,notified:true}:st));
-      showReminderAlert('Tarefa Avulsa',t.tx,'__standalone__',t.id);
-      fireBrowserNotif('Tarefa Avulsa',t.tx);
-    }
-  });
-}
 
 
 function standaloneLinkPickSys(tid,name,url){
