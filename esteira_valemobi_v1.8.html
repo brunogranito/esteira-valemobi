@@ -735,7 +735,11 @@ body.light .paci-name{color:#1e293b}
         <button class="bell-btn" id="bellBtn" onclick="openNotifSidebar()" title="Lembretes">🔔</button>
         <span class="bell-count" id="bellCount" style="display:none">0</span>
       </div>
-      <button class="arch-badge" id="archBadge" onclick="toggleArchived()">📦 0 arquivados</button>
+      <button onclick="openAddCardModal()" title="Adicionar novo card"
+  style="background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.35);color:#38bdf8;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+  + Card
+</button>
+<button class="arch-badge" id="archBadge" onclick="toggleArchived()">📦 0 arquivados</button>
     </div>
   </div>
   <div id="archPanel" style="display:none">
@@ -748,7 +752,7 @@ body.light .paci-name{color:#1e293b}
 </div>
 
 <!-- PROJECT MODAL -->
-<div class="modal-bg" id="modalBg">
+<div class="modal-bg" id="modalBg" onmousedown="_ovMD=event.target===this" onclick="if(event.target===this&&_ovMD){_ovMD=false;closeModal();}">
   <div class="modal">
     <div class="mhd">
       <div class="mhd-top">
@@ -891,6 +895,39 @@ body.light .paci-name{color:#1e293b}
     </div>
     <button class="link-save-btn" onclick="saveLinkModal()">Adicionar</button>
     <button class="link-cancel-btn" onclick="closeLinkModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- ADD CARD MODAL -->
+<div id="addCardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1e293b;border:1px solid rgba(71,85,105,.3);border-radius:12px;padding:24px;width:min(480px,100%);box-shadow:0 12px 32px rgba(0,0,0,.7)">
+    <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:16px">➕ Novo Card</div>
+    <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Nome da demanda *</label>
+    <input id="ncName" class="mef-inp" placeholder="Ex: Custódia Remunerada" style="width:100%;margin-bottom:10px">
+    <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Código Jira</label>
+    <input id="ncCode" class="mef-inp" placeholder="Ex: BAPG-1234" style="width:100%;margin-bottom:10px">
+    <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Stage inicial</label>
+    <select id="ncStage" style="width:100%;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;margin-bottom:10px">
+      <option value="escopo">📋 Escopo</option>
+      <option value="aguardando">⏳ Ag. Aprovação de Horas</option>
+      <option value="descoberta">🔍 Descob./Refin.</option>
+      <option value="dev">⚙ Dev</option>
+      <option value="qa" selected>✅ QA</option>
+      <option value="homolog">🏗 Homologação</option>
+      <option value="rdm">🚀 RDM</option>
+      <option value="posrdm">📊 Pós-RDM</option>
+    </select>
+    <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Prioridade</label>
+    <select id="ncPrio" style="width:100%;background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;margin-bottom:16px">
+      <option value="normal">Normal</option>
+      <option value="high">🟠 Alta</option>
+      <option value="urgent">🔴 Urgente</option>
+      <option value="low">Baixa</option>
+    </select>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmAddCard()" style="flex:1;background:linear-gradient(90deg,#06b6d4,#14b8a6);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Criar card</button>
+      <button onclick="closeAddCardModal()" style="flex:1;background:none;border:1px solid rgba(71,85,105,.3);color:#64748b;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -3596,8 +3633,14 @@ function savePermanentTasks(data){ lsSet('permanentTasks',data); sbSet('permanen
 
 function promoteTaskToDefault(tid,stageId,sectionS){
   const p=getP(selId);if(!p)return;
-  const ct=((p.customTasks||{})[stageId]||[]).find(t=>t.tid===tid);
-  if(!ct){showToast('Erro','Apenas tarefas customizadas podem ser promovidas.');return;}
+  // Look in customTasks and injectedTasks
+  let ct=((p.customTasks||{})[stageId]||[]).find(t=>t.tid===tid);
+  if(!ct){
+    // Check injectedTasks
+    const injSec=Object.values((p.injectedTasks||{})[stageId]||{}).flat();
+    ct=injSec.find(t=>t.tid===tid);
+  }
+  if(!ct){showToast('Erro','Apenas tarefas adicionadas por você podem ser promovidas a padrão.');return;}
   if(!confirm(`Tornar "${ct.tx}" uma tarefa padrão em todos os cards do stage "${STAGES.find(s=>s.id===stageId)?.label||stageId}"?\n\nEla aparecerá em todos os novos cards desta esteira.`))return;
   const data=getPermanentTasks();
   if(!data[stageId])data[stageId]=[];
@@ -3960,6 +4003,132 @@ function standaloneLinkPickSys(tid,name,url){
   const ui=document.getElementById('st-lu-'+tid);
   if(ni)ni.value=name;if(ui)ui.value=url;
 }
+
+function pullJiraAssignee(){
+  const p=getP(selId);if(!p||!p.code)return;
+  const codes=extractJiraCodes(p.code);
+  if(!codes.length){showToast('Sem código Jira','Adicione um código JIRA ao card primeiro.');return;}
+  const code=codes[0];
+  const inp=document.getElementById('devInp');
+  if(inp) inp.value='Buscando…';
+  jiraFetch(`issue/${code}?fields=assignee`).then(issue=>{
+    const name=issue?.fields?.assignee?.displayName||'';
+    if(name){
+      setP(selId,{dev:name});
+      renderInfo();
+      showToast('💻 Dev atualizado',name);
+    } else {
+      if(inp) inp.value=p.dev||'';
+      showToast('Sem assignee','Nenhum assignee encontrado no Jira.');
+    }
+  }).catch(()=>{if(inp) inp.value=p.dev||'';showToast('Erro Jira','Falha ao buscar assignee.');});
+}
+
+/* ── @ MENTIONS IN TASK EDITING ────────────────────────── */
+let _taskAtDropdown=null;
+
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(!el.id||!el.id.startsWith('editInp-'))return;
+  const val=el.value,pos=el.selectionStart;
+  const before=val.substring(0,pos);
+  const atIdx=before.lastIndexOf('@');
+  if(atIdx<0){removeTaskAtDropdown();return;}
+  if(atIdx>0&&!/[\s,]/.test(before[atIdx-1])){removeTaskAtDropdown();return;}
+  const query=before.substring(atIdx+1);
+  if(/\s/.test(query)){removeTaskAtDropdown();return;}
+  showTaskAtDropdown(el,atIdx,query);
+});
+
+function showTaskAtDropdown(el,atIdx,query){
+  removeTaskAtDropdown();
+  const people=getPeople().filter(p=>!query||p.name.toLowerCase().includes(query.toLowerCase())).slice(0,6);
+  if(!people.length){return;}
+  const rect=el.getBoundingClientRect();
+  const dd=document.createElement('div');
+  dd.id='taskAtDrop';
+  dd.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;min-width:180px;
+    background:#1e293b;border:1px solid rgba(71,85,105,.4);border-radius:8px;z-index:3000;
+    box-shadow:0 6px 20px rgba(0,0,0,.6);overflow:hidden`;
+  dd.innerHTML=people.map(p=>{
+    const ini=p.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    return `<div onmousedown="event.preventDefault();selectTaskAt(event,'${el.id}',${atIdx},'${p.name.replace(/'/g,"\\'")}\')"
+      style="display:flex;align-items:center;gap:8px;padding:7px 11px;cursor:pointer;transition:background .1s"
+      onmouseover="this.style.background='rgba(6,182,212,.1)'" onmouseout="this.style.background=''">
+      <div style="width:24px;height:24px;border-radius:50%;background:${p.color||'#0284c7'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${ini}</div>
+      <div><div style="font-size:11px;font-weight:600;color:#e2e8f0">${p.name}</div><div style="font-size:9px;color:#64748b">${p.role||''}</div></div>
+    </div>`;
+  }).join('');
+  document.body.appendChild(dd);
+  _taskAtDropdown=dd;
+}
+
+function selectTaskAt(e,inpId,atIdx,name){
+  const inp=document.getElementById(inpId);
+  if(!inp)return;
+  const before=inp.value.substring(0,atIdx);
+  const after=inp.value.substring(inp.selectionStart);
+  inp.value=before+'@'+name+' '+after;
+  inp.focus();
+  const newPos=atIdx+1+name.length+1;
+  inp.setSelectionRange(newPos,newPos);
+  removeTaskAtDropdown();
+}
+
+function removeTaskAtDropdown(){
+  const dd=document.getElementById('taskAtDrop');
+  if(dd)dd.remove();
+  _taskAtDropdown=null;
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&_taskAtDropdown) removeTaskAtDropdown();
+});
+document.addEventListener('click',e=>{
+  if(_taskAtDropdown&&!_taskAtDropdown.contains(e.target)) removeTaskAtDropdown();
+});
+
+/* ── ADD CARD MANUALLY ──────────────────────────────────── */
+function openAddCardModal(){
+  const m=document.getElementById('addCardModal');
+  if(m){m.style.display='flex';setTimeout(()=>document.getElementById('ncName')?.focus(),50);}
+}
+function closeAddCardModal(){
+  const m=document.getElementById('addCardModal');
+  if(m) m.style.display='none';
+}
+function confirmAddCard(){
+  const name=(document.getElementById('ncName')?.value||'').trim();
+  if(!name){showToast('Nome obrigatório','Preencha o nome da demanda.');return;}
+  const code=(document.getElementById('ncCode')?.value||'').trim();
+  const stage=document.getElementById('ncStage')?.value||'escopo';
+  const priority=document.getElementById('ncPrio')?.value||'normal';
+  const newCard={
+    id:'card_'+Date.now(),
+    name, code: code||'—',
+    stage, priority,
+    owner:'Bruno Granito', qa:'', dev:'',
+    progress:0, notes:'', desc:'', blockers:[],
+    links:[], checks:{}, dis:{}, customTasks:{},
+    taskText:{}, taskDates:{}, taskNotified:{},
+    meetings:[], deps:[], stageHistory:[{stage,enteredAt:new Date().toISOString()}],
+    rmdDate:'', jiraStatus:'', archived:false,
+  };
+  projects.push(newCard);
+  addToOrder(stage,newCard.id);
+  saveProjects();saveOrders();
+  renderBoard();renderStats();
+  closeAddCardModal();
+  openModal(newCard.id);
+  logActivity('Card criado manualmente',name,newCard.id,name);
+  showToast('✅ Card criado',name);
+}
+
+// Close add card modal on outside click
+document.addEventListener('click',e=>{
+  const m=document.getElementById('addCardModal');
+  if(m&&e.target===m) closeAddCardModal();
+});
 
 const INIT=[
   {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Bruno Granito",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
@@ -4455,6 +4624,7 @@ function renderModal(){
     PRIO[p.priority]?`<span class="tag">${PRIO[p.priority].icon} ${PRIO[p.priority].label}</span>`:"",
     p.owner?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">👤 ${p.owner}</span>`:"<span class='tag' onclick='editOwnerQA()' title='Adicionar responsável' style='cursor:pointer;color:#475569'>👤 —</span>",
     p.qa?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">✅ ${p.qa}</span>`:"",
+    p.dev?`<span class="tag" style="border-color:rgba(99,102,241,.4);color:#818cf8">💻 ${p.dev}</span>`:"",
     p.rmdDate?`<span class="tag" style="border-color:rgba(139,92,246,.5);color:#c084fc">🗓 ${p.rmdDate}</span>`:"",
     p.jiraStatus?`<span class="tag" style="border-color:rgba(6,182,212,.35);color:#38bdf8" title="Status no Jira">🎯 Jira: ${p.jiraStatus}</span>`:"",
   ].filter(Boolean).join("");
@@ -4527,24 +4697,29 @@ function renderInfo(){
   </div>`;
   h+=`<span class="slbl" style="display:block;margin:14px 0 6px">Prioridade</span><div class="prio-row" style="margin-bottom:14px">${Object.entries(PRIO).map(([k,v])=>`<button class="prio-btn${p.priority===k?" active":""}" onclick="setPrio('${k}')">${v.icon} ${v.label}</button>`).join("")}</div>`;
 
-  // Owner / QA — editáveis
-  const allPeople=getPeople().map(p=>p.name);
-  const ownerList=allPeople.map(n=>`<option value="${n}">`).join('');
-  const qaList=allPeople.map(n=>`<option value="${n}">`).join('');
-  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+  // Owner / QA / Dev — editáveis (com autocomplete de Pessoas)
+  const allPeople=getPeople().map(per=>per.name);
+  const pplOpts=allPeople.map(n=>`<option value="${n}">`).join('');
+  h+=`<datalist id="pplList">${pplOpts}</datalist>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
     <div>
-      <span class="slbl" style="display:block;margin-bottom:5px">👤 Responsável (Owner)</span>
-      <datalist id="ownerList">${ownerList}</datalist>
-      <input class="rdm-date-inp" list="ownerList" value="${p.owner||''}" placeholder="Nome do responsável"
+      <span class="slbl" style="display:block;margin-bottom:5px">👤 Owner</span>
+      <input class="rdm-date-inp" list="pplList" value="${p.owner||''}" placeholder="Responsável"
         onchange="setP(selId,{owner:this.value.trim()});renderModal();renderBoard()"
         style="width:100%">
     </div>
     <div>
       <span class="slbl" style="display:block;margin-bottom:5px">✅ QA</span>
-      <datalist id="qaList">${qaList}</datalist>
-      <input class="rdm-date-inp" list="qaList" value="${p.qa||''}" placeholder="Nome do QA"
+      <input class="rdm-date-inp" list="pplList" value="${p.qa||''}" placeholder="QA"
         onchange="setP(selId,{qa:this.value.trim()});renderModal();renderBoard()"
         style="width:100%">
+    </div>
+    <div>
+      <span class="slbl" style="display:block;margin-bottom:5px">💻 Dev</span>
+      <input class="rdm-date-inp" list="pplList" id="devInp" value="${p.dev||''}" placeholder="Dev responsável"
+        onchange="setP(selId,{dev:this.value.trim()});renderModal();renderBoard()"
+        style="width:100%">
+      ${p.code?`<button onclick="pullJiraAssignee()" style="background:none;border:none;color:#475569;font-size:9px;cursor:pointer;margin-top:2px">↓ Puxar do Jira</button>`:''}
     </div>
   </div>`;
   // Links — always show section with add button
@@ -4825,8 +5000,23 @@ function saveTaskText(tid,stage,isCustom){
   const p=getP(selId);
   if(isCustom){
     const ct=((p.customTasks||{})[stage]||[]);
-    const updated=ct.map(c=>c.tid===tid?{...c,tx:newText}:c);
-    setP(selId,{customTasks:{...(p.customTasks||{}),[stage]:updated}});
+    const idx=ct.findIndex(c=>c.tid===tid);
+    if(idx>=0){
+      // Found in customTasks
+      const updated=ct.map(c=>c.tid===tid?{...c,tx:newText}:c);
+      setP(selId,{customTasks:{...(p.customTasks||{}),[stage]:updated}});
+    } else {
+      // Check injectedTasks
+      const inj=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+      let found=false;
+      Object.keys(inj[stage]||{}).forEach(secS=>{
+        const arr=inj[stage][secS]||[];
+        const ii=arr.findIndex(t=>t.tid===tid);
+        if(ii>=0){arr[ii]={...arr[ii],tx:newText};found=true;}
+      });
+      if(found) setP(selId,{injectedTasks:inj});
+      else setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
+    }
   } else {
     setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
   }
