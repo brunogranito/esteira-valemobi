@@ -4453,8 +4453,8 @@ function renderModal(){
   const tags=[
     st?`<span class="tag" style="border-color:${st.color}60;color:${st.color}">${st.icon} ${st.label}</span>`:"",
     PRIO[p.priority]?`<span class="tag">${PRIO[p.priority].icon} ${PRIO[p.priority].label}</span>`:"",
-    p.owner?`<span class="tag">👤 ${p.owner}</span>`:"",
-    p.qa?`<span class="tag">✅ ${p.qa}</span>`:"",
+    p.owner?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">👤 ${p.owner}</span>`:"<span class='tag' onclick='editOwnerQA()' title='Adicionar responsável' style='cursor:pointer;color:#475569'>👤 —</span>",
+    p.qa?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">✅ ${p.qa}</span>`:""
     p.rmdDate?`<span class="tag" style="border-color:rgba(139,92,246,.5);color:#c084fc">🗓 ${p.rmdDate}</span>`:"",
     p.jiraStatus?`<span class="tag" style="border-color:rgba(6,182,212,.35);color:#38bdf8" title="Status no Jira">🎯 Jira: ${p.jiraStatus}</span>`:"",
   ].filter(Boolean).join("");
@@ -4525,7 +4525,28 @@ function renderInfo(){
     <input class="rdm-date-inp" type="text" id="rmdInp" value="${p.rmdDate||''}" placeholder="ex: 28/07/2026" onchange="setRmdDate(this.value.trim())">
     <button class="btn-c" onclick="setRmdDate('')">✕</button>
   </div>`;
-  h+=`<span class="slbl" style="display:block;margin-bottom:7px">Prioridade</span><div class="prio-row" style="margin-bottom:16px">${Object.entries(PRIO).map(([k,v])=>`<button class="prio-btn${p.priority===k?" active":""}" onclick="setPrio('${k}')">${v.icon} ${v.label}</button>`).join("")}</div>`;
+  h+=`<span class="slbl" style="display:block;margin:14px 0 6px">Prioridade</span><div class="prio-row" style="margin-bottom:14px">${Object.entries(PRIO).map(([k,v])=>`<button class="prio-btn${p.priority===k?" active":""}" onclick="setPrio('${k}')">${v.icon} ${v.label}</button>`).join("")}</div>`;
+
+  // Owner / QA — editáveis
+  const allPeople=getPeople().map(p=>p.name);
+  const ownerList=allPeople.map(n=>`<option value="${n}">`).join('');
+  const qaList=allPeople.map(n=>`<option value="${n}">`).join('');
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <div>
+      <span class="slbl" style="display:block;margin-bottom:5px">👤 Responsável (Owner)</span>
+      <datalist id="ownerList">${ownerList}</datalist>
+      <input class="rdm-date-inp" list="ownerList" value="${p.owner||''}" placeholder="Nome do responsável"
+        onchange="setP(selId,{owner:this.value.trim()});renderModal();renderBoard()"
+        style="width:100%">
+    </div>
+    <div>
+      <span class="slbl" style="display:block;margin-bottom:5px">✅ QA</span>
+      <datalist id="qaList">${qaList}</datalist>
+      <input class="rdm-date-inp" list="qaList" value="${p.qa||''}" placeholder="Nome do QA"
+        onchange="setP(selId,{qa:this.value.trim()});renderModal();renderBoard()"
+        style="width:100%">
+    </div>
+  </div>`;
   // Links — always show section with add button
   h+=`<span class="slbl" style="display:block;margin-bottom:7px">Links</span>`;
   h+=`<div class="links-manage-row">`;
