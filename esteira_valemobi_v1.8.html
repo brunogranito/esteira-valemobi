@@ -3878,6 +3878,49 @@ function saveStandaloneEdit(id,newTx){
   saveStandaloneTasks(tasks);
   renderTasksPanel();
 }
+
+function renderStandaloneTaskRow(t){
+  const isRecur=t.recurrence;
+  const hasDue=!!t.dueDate;
+  const hasRef=!!(t.links?.length||t.attachments?.length);
+  const totalRef=(t.links?.length||0)+(t.attachments?.length||0);
+  const dueStr=hasDue?new Date(t.dueDate).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  return `<div id="st-row-${t.id}" style="background:rgba(15,23,42,.4);border:1px solid rgba(71,85,105,.2);border-radius:7px;margin-bottom:6px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:7px;padding:8px 10px">
+      <input type="checkbox" class="tp-task-cb" ${t.done?'checked':''}
+        onchange="toggleStandaloneTask('${t.id}',this.checked)">
+      <span class="tp-task-txt${t.done?' done':''}" style="flex:1;font-size:11px;cursor:pointer" onclick="startEditStandalone('${t.id}')" title="Clique para editar">${t.tx}${isRecur?' <span style="color:#818cf8;font-size:9px">🔁 '+(RECUR_LABELS[isRecur]||'')+'</span>':''}${hasDue?' <span style="color:#fbbf24;font-size:9px">📅 '+dueStr+'</span>':''}</span>
+      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+        <button onclick="startEditStandalone('${t.id}')" title="Editar"
+          style="background:none;border:none;color:#475569;cursor:pointer;font-size:12px;padding:2px 3px">✏</button>
+        <select onchange="setStandaloneRecurrence('${t.id}',this.value)"
+          style="font-size:9px;background:#0f1e2e;border:1px solid rgba(71,85,105,.2);color:${isRecur?'#818cf8':'#334155'};border-radius:3px;padding:1px 3px;cursor:pointer;max-width:52px" title="Recorrência">
+          <option value="" ${!isRecur?'selected':''}>1x</option>
+          <option value="daily" ${isRecur==='daily'?'selected':''}>🔁 D</option>
+          <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
+          <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
+        </select>
+        <button onclick="toggleStandaloneRemind('${t.id}')" title="${hasDue?'Lembrete: '+dueStr:'Adicionar lembrete'}"
+          style="background:none;border:none;color:${hasDue?'#fbbf24':'#334155'};cursor:pointer;font-size:13px;padding:2px">${hasDue?'🔔':'🔕'}</button>
+        <button onclick="toggleStandaloneRef('${t.id}')" title="Referências e anexos"
+          style="background:none;border:none;color:${hasRef?'#38bdf8':'#334155'};cursor:pointer;font-size:13px;padding:2px">📎${totalRef>0?'<sup style="font-size:8px">'+totalRef+'</sup>':''}</button>
+        <button onclick="deleteStandaloneTask('${t.id}')"
+          style="background:none;border:none;color:#334155;cursor:pointer;font-size:13px;padding:2px" title="Remover">🗑</button>
+      </div>
+    </div>
+    <div id="st-remind-${t.id}" style="display:none;padding:6px 10px 8px 34px;background:rgba(0,0,0,.15);border-top:1px solid rgba(71,85,105,.15)">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <input type="datetime-local" value="${t.dueDate||''}"
+          style="background:rgba(15,23,42,.8);border:1px solid rgba(71,85,105,.3);color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:10px;outline:none"
+          onchange="setStandaloneReminder('${t.id}',this.value)">
+        ${hasDue?'<button onclick="setStandaloneReminder(\''+t.id+'\',\'\')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;margin-left:4px">✕ Remover</button>':''}
+      </div>
+    </div>
+    <div id="st-ref-${t.id}" style="display:none;padding:8px 10px;background:rgba(0,0,0,.15);border-top:1px solid rgba(71,85,105,.15)">
+      ${renderStandaloneRefs(t)}
+    </div>
+  </div>`;
+}
   const isRecur=t.recurrence;
   const hasDue=!!t.dueDate;
   const hasRef=!!(t.links?.length||t.attachments?.length);
