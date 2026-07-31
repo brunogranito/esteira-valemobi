@@ -3853,7 +3853,31 @@ function renderStandaloneRefs(t){
   return h;
 }
 
-function renderStandaloneTaskRow(t){
+function startEditStandalone(id){
+  const row=document.getElementById('st-row-'+id);
+  if(!row)return;
+  const t=getStandaloneTasks().find(t=>t.id===id);
+  if(!t)return;
+  const span=row.querySelector('.tp-task-txt');
+  if(!span)return;
+  const inp=document.createElement('input');
+  inp.value=t.tx;
+  inp.style.cssText='flex:1;background:rgba(15,23,42,.8);border:1px solid #06b6d4;color:#e2e8f0;padding:3px 8px;border-radius:4px;font-size:11px;outline:none';
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){saveStandaloneEdit(id,inp.value);return;}
+    if(e.key==='Escape'){renderTasksPanel();}
+  };
+  inp.onblur=()=>saveStandaloneEdit(id,inp.value);
+  span.replaceWith(inp);
+  inp.focus();inp.select();
+}
+function saveStandaloneEdit(id,newTx){
+  const txt=(newTx||'').trim();
+  if(!txt)return;
+  const tasks=getStandaloneTasks().map(t=>t.id===id?{...t,tx:txt}:t);
+  saveStandaloneTasks(tasks);
+  renderTasksPanel();
+}
   const isRecur=t.recurrence;
   const hasDue=!!t.dueDate;
   const hasRef=!!(t.links?.length||t.attachments?.length);
@@ -3863,8 +3887,10 @@ function renderStandaloneTaskRow(t){
     <div style="display:flex;align-items:center;gap:7px;padding:8px 10px">
       <input type="checkbox" class="tp-task-cb" ${t.done?'checked':''}
         onchange="toggleStandaloneTask('${t.id}',this.checked)">
-      <span class="tp-task-txt${t.done?' done':''}" style="flex:1;font-size:11px">${t.tx}${isRecur?` <span style="color:#818cf8;font-size:9px">🔁 ${RECUR_LABELS[isRecur]||''}</span>`:''}${hasDue?` <span style="color:#fbbf24;font-size:9px">📅 ${dueStr}</span>`:''}</span>
+      <span class="tp-task-txt${t.done?' done':''}" style="flex:1;font-size:11px;cursor:pointer" onclick="startEditStandalone('${t.id}')" title="Clique para editar">${t.tx}${isRecur?` <span style="color:#818cf8;font-size:9px">🔁 ${RECUR_LABELS[isRecur]||''}</span>`:''}${hasDue?` <span style="color:#fbbf24;font-size:9px">📅 ${dueStr}</span>`:''}</span>
       <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+        <button onclick="startEditStandalone('${t.id}')" title="Editar"
+          style="background:none;border:none;color:#334155;cursor:pointer;font-size:12px;padding:2px">✏</button>
         <select onchange="setStandaloneRecurrence('${t.id}',this.value)"
           style="font-size:9px;background:#0f1e2e;border:1px solid rgba(71,85,105,.2);color:${isRecur?'#818cf8':'#334155'};border-radius:3px;padding:1px 3px;cursor:pointer;max-width:52px" title="Recorrência">
           <option value="" ${!isRecur?'selected':''}>1x</option>
