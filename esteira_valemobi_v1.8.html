@@ -4454,7 +4454,7 @@ function renderModal(){
     st?`<span class="tag" style="border-color:${st.color}60;color:${st.color}">${st.icon} ${st.label}</span>`:"",
     PRIO[p.priority]?`<span class="tag">${PRIO[p.priority].icon} ${PRIO[p.priority].label}</span>`:"",
     p.owner?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">👤 ${p.owner}</span>`:"<span class='tag' onclick='editOwnerQA()' title='Adicionar responsável' style='cursor:pointer;color:#475569'>👤 —</span>",
-    p.qa?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">✅ ${p.qa}</span>`:""
+    p.qa?`<span class="tag" onclick="editOwnerQA()" title="Clique para editar" style="cursor:pointer">✅ ${p.qa}</span>`:"",
     p.rmdDate?`<span class="tag" style="border-color:rgba(139,92,246,.5);color:#c084fc">🗓 ${p.rmdDate}</span>`:"",
     p.jiraStatus?`<span class="tag" style="border-color:rgba(6,182,212,.35);color:#38bdf8" title="Status no Jira">🎯 Jira: ${p.jiraStatus}</span>`:"",
   ].filter(Boolean).join("");
