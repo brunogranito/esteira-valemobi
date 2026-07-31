@@ -3226,6 +3226,29 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   e.preventDefault();e.stopPropagation();
   if(!dragTaskId||dragTaskId===toTid)return;
   const p=getP(selId);if(!p)return;
+  const [sId,secS]=sectionKey.split('|||');
+  const fromKey=dragTaskStage+'|||__custom__';
+  const isFromCustom=(_sectionTaskIds[fromKey]||[]).includes(dragTaskId);
+
+  // ── Cross-section: arrastar tarefa customizada para seção padrão ──
+  if(isFromCustom&&secS!=='__custom__'){
+    const customTasks=[...((p.customTasks||{})[sId]||[])];
+    const task=customTasks.find(t=>t.tid===dragTaskId);
+    if(!task)return;
+    const newCustom=customTasks.filter(t=>t.tid!==dragTaskId);
+    const injected={...(p.injectedTasks||{})};
+    if(!injected[sId])injected[sId]={};
+    const secList=[...(injected[sId][secS]||[])];
+    const toIds=_sectionTaskIds[sectionKey]||[];
+    const toIdx=toIds.indexOf(toTid);
+    secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:task.tx});
+    injected[sId][secS]=secList;
+    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:newCustom},injectedTasks:injected});
+    renderCheck();
+    return;
+  }
+
+  // ── Reordenar dentro da mesma seção ──────────────────────────
   const ids=_sectionTaskIds[sectionKey];
   if(!ids||!ids.length)return;
   const order=[...ids];
@@ -3233,18 +3256,17 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   const toIdx=order.indexOf(toTid);
   if(fromIdx<0||toIdx<0)return;
   order.splice(toIdx,0,order.splice(fromIdx,1)[0]);
-  const [sId,secS]=sectionKey.split('|||');
+
   if(secS==='__custom__'){
-    // Reorder custom tasks
+    // Reordenar tarefas customizadas
     const ct=[...((p.customTasks||{})[sId]||[])];
-    const fromTask=ct.find(t=>t.tid===dragTaskId);
-    const toTask=ct.find(t=>t.tid===toTid);
-    if(!fromTask||!toTask)return;
-    const fi=ct.indexOf(fromTask),ti=ct.indexOf(toTask);
+    const fi=ct.findIndex(t=>t.tid===dragTaskId);
+    const ti=ct.findIndex(t=>t.tid===toTid);
+    if(fi<0||ti<0)return;
     ct.splice(ti,0,ct.splice(fi,1)[0]);
     setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
   } else {
-    // Reorder default tasks — store order
+    // Reordenar tarefas padrão — salvar ordem
     const to={...(p.taskOrder||{})};
     if(!to[sId])to[sId]={};
     to[sId][secS]=order;
@@ -3522,44 +3544,9 @@ function promoteTaskToDefault(tid,stageId,sectionS){
   }
 }
 
-// ── Cross-section drag: allow custom tasks to drop into default sections ──
-// Override dropOnAnyTask to handle cross-section drops
-const _origDropOnAny=dropOnAnyTask;
-function dropOnAnyTask(e,toTid,stageId,sectionKey){
-  e.preventDefault();e.stopPropagation();
-  if(!dragTaskId||dragTaskId===toTid)return;
-  const fromKey=dragTaskStage+'|||__custom__';
-  const isFromCustom=(_sectionTaskIds[fromKey]||[]).includes(dragTaskId);
+// ── Cross-section drag e reordenamento: tratado em dropOnAnyTask acima ──
 
-  // If dragging custom task to a default section, inject it there
-  if(isFromCustom&&sectionKey!==fromKey){
-    const p=getP(selId);if(!p)return;
-    const toSectionS=sectionKey.split('|||')[1];
-    if(toSectionS==='__custom__'){
-      // reorder within custom
-      _origDropOnAny(e,toTid,stageId,sectionKey);
-      return;
-    }
-    // Move: remove from custom, inject into default section order
-    const customTasks=[...((p.customTasks||{})[stageId]||[])];
-    const task=customTasks.find(t=>t.tid===dragTaskId);
-    if(!task)return;
-    const newCustom=customTasks.filter(t=>t.tid!==dragTaskId);
-    // Add as injected task in target section
-    const injected={...(p.injectedTasks||{})};
-    if(!injected[stageId])injected[stageId]={};
-    const secList=[...(injected[stageId][toSectionS]||[])];
-    // Insert at position of toTid
-    const toIds=_sectionTaskIds[sectionKey]||[];
-    const toIdx=toIds.indexOf(toTid);
-    secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:task.tx});
-    injected[stageId][toSectionS]=secList;
-    setP(selId,{customTasks:{...(p.customTasks||{}),[stageId]:newCustom},injectedTasks:injected});
-    renderCheck();
-    return;
-  }
-  _origDropOnAny(e,toTid,stageId,sectionKey);
-}
+
 
 
 const INIT=[
