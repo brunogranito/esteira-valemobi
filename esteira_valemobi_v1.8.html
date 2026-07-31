@@ -3676,11 +3676,8 @@ function addStandaloneTask(){
   if(inp)inp.value='';
   renderTasksPanel();
 }
-function toggleStandaloneTask(id,val){
-  const tasks=getStandaloneTasks().map(t=>t.id===id?{...t,done:val}:t);
-  saveStandaloneTasks(tasks);
-  renderTasksPanel();
-}
+// toggleStandaloneTask: defined below with recurrence support
+
 function deleteStandaloneTask(id){
   saveStandaloneTasks(getStandaloneTasks().filter(t=>t.id!==id));
   renderTasksPanel();
@@ -3933,6 +3930,12 @@ function checkReminders(){
   });
 }
 
+
+function standaloneLinkPickSys(tid,name,url){
+  const ni=document.getElementById('st-ln-'+tid);
+  const ui=document.getElementById('st-lu-'+tid);
+  if(ni)ni.value=name;if(ui)ui.value=url;
+}
 
 const INIT=[
   {id:"vi",name:"Valor Investido",code:"BAPD-2246/2723",stage:"qa",priority:"urgent",owner:"Bruno Granito",qa:"Bruno Granito",rmdDate:"28/07/2026",progress:65,
