@@ -4470,9 +4470,9 @@ function renderModal(){
   const tags=[
     st?`<span class="tag" style="border-color:${st.color}60;color:${st.color}">${st.icon} ${st.label}</span>`:"",
     PRIO[p.priority]?`<span class="tag">${PRIO[p.priority].icon} ${PRIO[p.priority].label}</span>`:"",
-    p.owner?`<span class="tag" style="cursor:pointer" onclick="sw('info')" title="Ver em Informações">👤 \${p.owner}</span>`:"",
-    p.qa?`<span class="tag" style="cursor:pointer" onclick="sw('info')" title="Ver em Informações">✅ \${p.qa}</span>`:"",
-    p.dev?`<span class="tag" style="border-color:rgba(99,102,241,.4);color:#818cf8">💻 \${p.dev}</span>`:"",
+    p.owner?`<span class="tag" style="cursor:pointer" onclick="sw('info')" title="Ver em Informações">👤 ${p.owner}</span>`:"",
+    p.qa?`<span class="tag" style="cursor:pointer" onclick="sw('info')" title="Ver em Informações">✅ ${p.qa}</span>`:"",
+    p.dev?`<span class="tag" style="border-color:rgba(99,102,241,.4);color:#818cf8">💻 ${p.dev}</span>`:"",
     p.rmdDate?`<span class="tag" style="border-color:rgba(139,92,246,.5);color:#c084fc">🗓 ${p.rmdDate}</span>`:"",
     p.jiraStatus?`<span class="tag" style="border-color:rgba(6,182,212,.35);color:#38bdf8" title="Status no Jira">🎯 Jira: ${p.jiraStatus}</span>`:"",
   ].filter(Boolean).join("");
@@ -4883,9 +4883,22 @@ function confirmAddTask(stage){
   renderCheck();
 }
 function deleteCustomTask(tid,stage){
-  const p=getP(selId);
-  const existing=(p.customTasks||{})[stage]||[];
-  setP(selId,{customTasks:{...(p.customTasks||{}),[stage]:existing.filter(c=>c.tid!==tid)}});
+  const p=getP(selId);if(!p)return;
+  // Busca em todos os stages (tarefas persistem entre stages)
+  const newCT={};
+  Object.entries(p.customTasks||{}).forEach(([s,tasks])=>{
+    newCT[s]=(tasks||[]).filter(c=>c.tid!==tid);
+  });
+  // Remove também de injectedTasks
+  const newInj=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+  Object.keys(newInj).forEach(s=>{
+    Object.keys(newInj[s]||{}).forEach(sec=>{
+      newInj[s][sec]=(newInj[s][sec]||[]).filter(t=>t.tid!==tid);
+    });
+  });
+  setP(selId,{customTasks:newCT,injectedTasks:newInj});
+  renderCheck();
+}});
   refreshProgress(selId);
   renderCheck();
 }
