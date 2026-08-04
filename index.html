@@ -3643,8 +3643,16 @@ function savePermanentTasks(data){ lsSet('permanentTasks',data); sbSet('permanen
 
 function promoteTaskToDefault(tid,stageId,sectionS){
   const p=getP(selId);if(!p)return;
-  const ct=((p.customTasks||{})[stageId]||[]).find(t=>t.tid===tid);
-  if(!ct){showToast('Erro','Apenas tarefas customizadas podem ser promovidas.');return;}
+  // Busca em TODOS os stages de customTasks (tarefas persistem entre stages)
+  let ct=null;
+  Object.values(p.customTasks||{}).flat().forEach(t=>{if(t.tid===tid)ct=t;});
+  // Se não encontrou, busca em injectedTasks (tarefa foi arrastada para seção padrão)
+  if(!ct){
+    Object.values(p.injectedTasks||{}).forEach(stageInj=>{
+      Object.values(stageInj||{}).flat().forEach(t=>{if(t.tid===tid)ct=t;});
+    });
+  }
+  if(!ct){showToast('Erro','Apenas tarefas adicionadas por você podem ser promovidas a padrão.');return;}
   if(!confirm(`Tornar "${ct.tx}" uma tarefa padrão em todos os cards do stage "${STAGES.find(s=>s.id===stageId)?.label||stageId}"?\n\nEla aparecerá em todos os novos cards desta esteira.`))return;
   const data=getPermanentTasks();
   if(!data[stageId])data[stageId]=[];
