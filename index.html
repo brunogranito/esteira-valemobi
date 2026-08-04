@@ -3315,28 +3315,64 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   if(!dragTaskId||dragTaskId===toTid)return;
   const p=getP(selId);if(!p)return;
   const [sId,secS]=sectionKey.split('|||');
-  const fromKey=dragTaskStage+'|||__custom__';
-  const isFromCustom=(_sectionTaskIds[fromKey]||[]).includes(dragTaskId);
+  const fromCustomKey=dragTaskStage+'|||__custom__';
+  const isFromCustom=(_sectionTaskIds[fromCustomKey]||[]).includes(dragTaskId);
 
-  // ── Cross-section: arrastar tarefa customizada para seção padrão ──
-  if(isFromCustom&&secS!=='__custom__'){
-    const customTasks=[...((p.customTasks||{})[sId]||[])];
-    const task=customTasks.find(t=>t.tid===dragTaskId);
+  // Verifica se é tarefa injetada (foi arrastada de custom para default antes)
+  const isInjected=Object.values((p.injectedTasks||{})[sId]||{}).flat().some(t=>t.tid===dragTaskId);
+
+  // ── Caso 1: Custom → seção padrão (injetar) ──────────────
+  if(isFromCustom && secS!=='__custom__'){
+    // Busca a tarefa em qualquer stage de customTasks
+    let task=null;
+    const newCT=JSON.parse(JSON.stringify(p.customTasks||{}));
+    Object.keys(newCT).forEach(s=>{
+      const idx=(newCT[s]||[]).findIndex(t=>t.tid===dragTaskId);
+      if(idx>=0){task=newCT[s][idx];newCT[s].splice(idx,1);}
+    });
     if(!task)return;
-    const newCustom=customTasks.filter(t=>t.tid!==dragTaskId);
-    const injected={...(p.injectedTasks||{})};
+    const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
     if(!injected[sId])injected[sId]={};
     const secList=[...(injected[sId][secS]||[])];
     const toIds=_sectionTaskIds[sectionKey]||[];
     const toIdx=toIds.indexOf(toTid);
     secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:task.tx});
     injected[sId][secS]=secList;
-    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:newCustom},injectedTasks:injected});
-    renderCheck();
-    return;
+    setP(selId,{customTasks:newCT,injectedTasks:injected});
+    renderCheck();return;
   }
 
-  // ── Reordenar dentro da mesma seção ──────────────────────────
+  // ── Caso 2: Injetada ou qualquer → volta para custom ─────
+  if(secS==='__custom__'){
+    if(isInjected){
+      // Remove de injectedTasks e volta para customTasks
+      const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+      let taskTx='';
+      Object.keys(injected[sId]||{}).forEach(sec=>{
+        const idx=(injected[sId][sec]||[]).findIndex(t=>t.tid===dragTaskId);
+        if(idx>=0){taskTx=injected[sId][sec][idx].tx;injected[sId][sec].splice(idx,1);}
+      });
+      const stageCT=[...((p.customTasks||{})[sId]||[])];
+      if(!stageCT.find(t=>t.tid===dragTaskId)){
+        // Insere na posição do toTid se possível
+        const ctIds=(_sectionTaskIds[sectionKey]||[]);
+        const toIdx=ctIds.indexOf(toTid);
+        stageCT.splice(toIdx<0?stageCT.length:toIdx,0,{tid:dragTaskId,tx:taskTx});
+      }
+      setP(selId,{injectedTasks:injected,customTasks:{...(p.customTasks||{}),[sId]:stageCT}});
+      renderCheck();return;
+    }
+    // Reordenar customTasks normais
+    const ct=JSON.parse(JSON.stringify((p.customTasks||{})[sId]||[]));
+    const fi=ct.findIndex(t=>t.tid===dragTaskId);
+    const ti=ct.findIndex(t=>t.tid===toTid);
+    if(fi<0||ti<0)return;
+    ct.splice(ti,0,ct.splice(fi,1)[0]);
+    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
+    renderCheck();return;
+  }
+
+  // ── Caso 3: Reordenar dentro de seção padrão (inclui injetadas) ──
   const ids=_sectionTaskIds[sectionKey];
   if(!ids||!ids.length)return;
   const order=[...ids];
@@ -3344,22 +3380,10 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   const toIdx=order.indexOf(toTid);
   if(fromIdx<0||toIdx<0)return;
   order.splice(toIdx,0,order.splice(fromIdx,1)[0]);
-
-  if(secS==='__custom__'){
-    // Reordenar tarefas customizadas
-    const ct=[...((p.customTasks||{})[sId]||[])];
-    const fi=ct.findIndex(t=>t.tid===dragTaskId);
-    const ti=ct.findIndex(t=>t.tid===toTid);
-    if(fi<0||ti<0)return;
-    ct.splice(ti,0,ct.splice(fi,1)[0]);
-    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
-  } else {
-    // Reordenar tarefas padrão — salvar ordem
-    const to={...(p.taskOrder||{})};
-    if(!to[sId])to[sId]={};
-    to[sId][secS]=order;
-    setP(selId,{taskOrder:to});
-  }
+  const to={...(p.taskOrder||{})};
+  if(!to[sId])to[sId]={};
+  to[sId][secS]=order;
+  setP(selId,{taskOrder:to});
   renderCheck();
 }
 
@@ -4679,12 +4703,18 @@ function renderCheck(){
     const notDis=tasks.filter(t=>!(p.dis||{})[t.id]);
     const done=notDis.filter(t=>(p.checks||{})[t.id]).length;
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
-    // Apply custom order to default tasks + inject permanent + injected tasks
+    // Aplica ordem a TODOS os tasks da seção (padrão + injected + permanentes)
     const taskOrder=getTaskOrder(p,active,sec.s);
-    const orderedTasks=applyTaskOrder(tasks,taskOrder);
+    const orderedDefault=applyTaskOrder(tasks,taskOrder);
     const permanentInSec=(getPermanentTasks()[active]||[]).filter(t=>t.sectionS===sec.s);
     const injectedInSec=((p.injectedTasks||{})[active]?.[sec.s]||[]);
-    const allSecTasks=[...orderedTasks,...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))];
+    const allSecTasksUnordered=[
+      ...orderedDefault,
+      ...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),
+      ...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))
+    ];
+    // Se há ordem salva com IDs de injetados, reaplica sobre todos
+    const allSecTasks=taskOrder?applyTaskOrder(allSecTasksUnordered,taskOrder):allSecTasksUnordered;
     const taskIds=allSecTasks.map(t=>t.id);
     // Store for drag-drop
     _sectionTaskIds[active+'|||'+sec.s]=taskIds;
@@ -4751,13 +4781,13 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
 
   let h=`<div class="clt${dis?" dis":""}" id="clt-${tid}"
     data-tid="${tid}" data-stage="${activeStage}" data-skey="${sectionKey}"
-    draggable="true"
-    ondragstart="startDragTask(event,'${tid}','${activeStage}')"
+    draggable="${isEditing?'false':'true'}"
+    ondragstart="if('${isEditing}'==='true')return false;startDragTask(event,'${tid}','${activeStage}')"
     ondragend="endDragTask(event)"
     ondragover="dragOverTask(event,'${tid}','${activeStage}')"
     ondrop="dropOnAnyTask(event,'${tid}','${activeStage}','${sectionKey}')">
     <div class="clt-main">
-      <span style="cursor:grab;color:#283548;font-size:12px;flex-shrink:0;user-select:none" title="Arrastar">⠿</span>
+      <span style="cursor:${isEditing?'default':'grab'};color:#283548;font-size:12px;flex-shrink:0;user-select:none" title="${isEditing?'':'Arrastar'}">⠿</span>
       <input type="checkbox" class="clt-chk" id="ck-${tid}" ${chk?"checked":""} ${dis?"disabled":""}
              onchange="toggleCk('${tid}',this.checked,'${activeStage}')">`;
   if(isEditing){
@@ -4849,9 +4879,28 @@ function saveTaskText(tid,stage,isCustom){
   if(!newText){cancelEditTask();return;}
   const p=getP(selId);
   if(isCustom){
-    const ct=((p.customTasks||{})[stage]||[]);
-    const updated=ct.map(c=>c.tid===tid?{...c,tx:newText}:c);
-    setP(selId,{customTasks:{...(p.customTasks||{}),[stage]:updated}});
+    // Busca em TODOS os stages de customTasks
+    const newCT=JSON.parse(JSON.stringify(p.customTasks||{}));
+    let found=false;
+    Object.keys(newCT).forEach(s=>{
+      const idx=(newCT[s]||[]).findIndex(c=>c.tid===tid);
+      if(idx>=0){newCT[s][idx]={...newCT[s][idx],tx:newText};found=true;}
+    });
+    if(found){
+      setP(selId,{customTasks:newCT});
+    } else {
+      // Busca em injectedTasks
+      const newInj=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+      let foundInj=false;
+      Object.keys(newInj).forEach(s=>{
+        Object.keys(newInj[s]||{}).forEach(sec=>{
+          const idx=(newInj[s][sec]||[]).findIndex(t=>t.tid===tid);
+          if(idx>=0){newInj[s][sec][idx]={...newInj[s][sec][idx],tx:newText};foundInj=true;}
+        });
+      });
+      if(foundInj) setP(selId,{injectedTasks:newInj});
+      else setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
+    }
   } else {
     setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
   }
