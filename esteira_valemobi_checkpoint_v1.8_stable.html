@@ -4843,15 +4843,23 @@ function renderCheck(){
   });
 
   // custom tasks for this stage
-  if(customByStage.length){
-    const notDisC=customByStage.filter(t=>!(p.dis||{})[t.tid]);
-    const doneC=notDisC.filter(t=>(p.checks||{})[t.tid]).length;
+  // Tarefas permanentes que foram promovidas da seção customizada (sectionS='__custom__' ou sem match no CL)
+  const _clSectionNames=new Set((CL[active]||[]).map(s=>s.s));
+  const permanentCustom=(getPermanentTasks()[active]||[]).filter(t=>
+    t.sectionS==='__custom__'||t.sectionS===''||!_clSectionNames.has(t.sectionS)
+  );
+
+  if(customByStage.length||permanentCustom.length){
+    const allCustom=[...customByStage,...permanentCustom.map(t=>({tid:t.tid,tx:t.tx,isPermanent:true}))];
+    const notDisC=allCustom.filter(t=>!(p.dis||{})[t.tid||t.id]);
+    const doneC=notDisC.filter(t=>(p.checks||{})[(t.tid||t.id)]).length;
     h+=`<div class="cl-sec"><div class="cl-sec-hd"><span>➕ Tarefas adicionadas</span><div style="display:flex;align-items:center;gap:7px"><span class="cl-sec-pct">${doneC}/${notDisC.length}</span></div></div>`;
-    customByStage.forEach(ct=>{
-      h+=renderTaskRow(p,ct.tid,{id:ct.tid,tx:ct.tx,info:null,links:[]},true,active,'__custom__',[]);
+    allCustom.forEach(ct=>{
+      const _isPerm=!!ct.isPermanent;
+      h+=renderTaskRow(p,ct.tid||ct.id,{id:ct.tid||ct.id,tx:ct.tx,info:null,links:[],isPermanent:_isPerm},!_isPerm,active,'__custom__',[]);
     });
     // Store custom task IDs for drag-drop
-    _sectionTaskIds[active+'|||__custom__']=customByStage.map(ct=>ct.tid);
+    _sectionTaskIds[active+'|||__custom__']=allCustom.map(ct=>ct.tid||ct.id);
     h+=`</div>`;
   }
 
