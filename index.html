@@ -3384,6 +3384,8 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   if(!to[sId])to[sId]={};
   to[sId][secS]=order;
   setP(selId,{taskOrder:to});
+  // Salva também globalmente (reflete em todos os cards da esteira)
+  setGlobalTaskOrder(sId,secS,order);
   renderCheck();
 }
 
@@ -3535,10 +3537,13 @@ function filterTaskRefAC(tid,q){
   const drop=document.getElementById('trl-ac-'+tid);
   if(!drop)return;
   if(!q||q.length<1){drop.style.display='none';return;}
-  const matches=getSystems().filter(s=>
+  // Combine Sistemas AND Templates
+  const _tpls=(getTemplates()||[]).map(t=>({name:t.name,url:'',icon:'📋',isTemplate:true}));
+  const _allItems=[...getSystems(),..._tpls];
+  const matches=_allItems.filter(s=>
     s.name.toLowerCase().includes(q.toLowerCase())||
     (s.url||'').toLowerCase().includes(q.toLowerCase())
-  ).slice(0,6);
+  ).slice(0,8);
   if(!matches.length){drop.style.display='none';return;}
   drop.innerHTML=matches.map(s=>
     `<div onmousedown="taskRefPickSys('${tid}','${s.name.replace(/'/g,"\\'")}','${(s.url||'').replace(/'/g,"\\'")}')"
@@ -3660,7 +3665,17 @@ function promoteTaskToDefault(tid,stageId,sectionS){
   if(!data[stageId].find(t=>t.tid===tid)){
     data[stageId].push({tid,tx:ct.tx,sectionS:sectionS||'Tarefas Adicionadas'});
     savePermanentTasks(data);
+    // Remove do card atual (evita duplicação)
+    const _p=getP(selId);
+    if(_p){
+      const _nCT=JSON.parse(JSON.stringify(_p.customTasks||{}));
+      Object.keys(_nCT).forEach(s=>{const idx=(_nCT[s]||[]).findIndex(t=>t.tid===tid);if(idx>=0)_nCT[s].splice(idx,1);});
+      const _nInj=JSON.parse(JSON.stringify(_p.injectedTasks||{}));
+      Object.keys(_nInj).forEach(s=>{Object.keys(_nInj[s]||{}).forEach(sec=>{_nInj[s][sec]=(_nInj[s][sec]||[]).filter(t=>t.tid!==tid);});});
+      setP(selId,{customTasks:_nCT,injectedTasks:_nInj});
+    }
     showToast('🌟 Tarefa promovida',`"${ct.tx}" agora aparece em todos os cards de ${STAGES.find(s=>s.id===stageId)?.label||stageId}.`);
+    renderCheck();
   }
 }
 
@@ -4008,6 +4023,76 @@ if(typeof _origCR==='function') window.checkReminders=(function(orig){
     });
   };
 }(_origCR));
+
+
+/* ── GLOBAL TASK TEXT (edição de tarefa padrão reflete em todos cards) ── */
+function getGlobalTaskText(){ return lsGet('globalTaskText')||{}; }
+function setGlobalTaskText(tid,tx){
+  const g={...getGlobalTaskText(),[tid]:tx};
+  lsSet('globalTaskText',g); sbSet('globalTaskText',g).catch(()=>{});
+}
+
+/* ── GLOBAL TASK ORDER (ordem de tarefa padrão reflete em todos cards) ── */
+function getGlobalTaskOrder(){ return lsGet('globalTaskOrder')||{}; }
+function setGlobalTaskOrder(stageId,sectionS,order){
+  const g=JSON.parse(JSON.stringify(getGlobalTaskOrder()));
+  if(!g[stageId])g[stageId]={};
+  g[stageId][sectionS]=order;
+  lsSet('globalTaskOrder',g); sbSet('globalTaskOrder',g).catch(()=>{});
+}
+
+/* ── HIDDEN TASKS PER CARD ── */
+function hideTaskForCard(pid,tid){
+  const p=getP(pid);if(!p)return;
+  setP(pid,{taskHidden:{...(p.taskHidden||{}),[tid]:true}});
+}
+
+/* ── GLOBALLY REMOVED TASKS ── */
+function getGlobalRemovedTasks(){ return lsGet('globalRemovedTasks')||{}; }
+function removeTaskGlobally(stageId,tid){
+  const g={...getGlobalRemovedTasks()};
+  if(!g[stageId])g[stageId]=[];
+  if(!g[stageId].includes(tid)){g[stageId].push(tid);}
+  lsSet('globalRemovedTasks',g); sbSet('globalRemovedTasks',g).catch(()=>{});
+}
+function restoreGlobalTask(stageId,tid){
+  const g={...getGlobalRemovedTasks()};
+  if(g[stageId])g[stageId]=g[stageId].filter(t=>t!==tid);
+  lsSet('globalRemovedTasks',g); sbSet('globalRemovedTasks',g).catch(()=>{});
+}
+
+/* ── REMOVE DEFAULT/PERMANENT TASK (pergunta opção) ── */
+function removeDefaultTask(tid,stageId,taskLabel,isPermanent){
+  const choice=confirm(
+    `"${taskLabel}"\n\nComo deseja remover esta tarefa?\n\n`+
+    `• OK = Remover deste card apenas\n`+
+    `• Cancelar = Remover de TODOS os cards desta esteira${isPermanent?' (deixa de ser padrão)':''}`
+  );
+  if(choice){
+    // Só este card: oculta (taskHidden)
+    hideTaskForCard(selId,tid);
+    if(isPermanent){
+      // Também marca N/A neste card pra não contar no progresso
+      const p=getP(selId);
+      setP(selId,{taskHidden:{...(p?.taskHidden||{}),[tid]:true}});
+    }
+  } else {
+    // Todos os cards: remove globalmente
+    if(isPermanent){
+      // Remove de permanentTasks
+      const data=getPermanentTasks();
+      if(data[stageId])data[stageId]=data[stageId].filter(t=>t.tid!==tid);
+      savePermanentTasks(data);
+    } else {
+      // Adiciona à lista de removidos globalmente
+      removeTaskGlobally(stageId,tid);
+    }
+    // Remove deste card também
+    const p=getP(selId);
+    setP(selId,{taskHidden:{...(p?.taskHidden||{}),[tid]:true}});
+  }
+  renderCheck();
+}
 
 
 const INIT=[
@@ -4713,7 +4798,12 @@ function renderCheck(){
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
     // Aplica ordem a TODOS os tasks da seção (padrão + injected + permanentes)
     const taskOrder=getTaskOrder(p,active,sec.s);
-    const orderedDefault=applyTaskOrder(tasks,taskOrder);
+    const _globalRemoved=(getGlobalRemovedTasks()||{})[active]||[];
+    const _filteredTasks=tasks.filter(t=>!_globalRemoved.includes(t.id)&&!(p.taskHidden||{})[t.id]);
+    // Apply global order first, then per-card order
+    const _globalOrder=(getGlobalTaskOrder()||{})[active]?.[sec.s];
+    const _orderToApply=taskOrder||_globalOrder;
+    const orderedDefault=applyTaskOrder(_filteredTasks,_orderToApply);
     const permanentInSec=(getPermanentTasks()[active]||[]).filter(t=>t.sectionS===sec.s);
     const injectedInSec=((p.injectedTasks||{})[active]?.[sec.s]||[]);
     const allSecTasksUnordered=[
@@ -4736,11 +4826,14 @@ function renderCheck(){
         <button class="add-sec-btn" onclick="showAddTask('${sec.s}','${active}')">+</button>
       </div>
     </div>`;
-    allSecTasks.forEach(task=>{
+    allSecTasks.forEach((task,_taskIdx)=>{
       const isExtra=!!(task.isPermanent||task.isInjected);
+      const _gTxt=(getGlobalTaskText()||{})[task.id];
       const fullTask=isExtra?{id:task.id,tx:task.tx,info:null,links:[]}:
-                              {...task,tx:(p.taskText||{})[task.id]||task.tx};
-      h+=renderTaskRow(p,task.id,fullTask,isExtra,active,sec.s,taskIds);
+                              {...task,tx:_gTxt||(p.taskText||{})[task.id]||task.tx};
+      // Skip hidden tasks
+      if((p.taskHidden||{})[task.id])return;
+      h+=renderTaskRow(p,task.id,fullTask,isExtra,active,sec.s,taskIds,_taskIdx);
     });
     h+=`</div>`;
   });
@@ -4773,7 +4866,7 @@ function renderCheck(){
   document.getElementById("tCheck").innerHTML=h;
 }
 
-function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
+function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds,_taskNum){
   const chk=(p.checks||{})[tid]||false;
   const dis=(p.dis||{})[tid]||false;
   const exp=expanded[tid]||false;
@@ -4796,13 +4889,17 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
     ondrop="dropOnAnyTask(event,'${tid}','${activeStage}','${sectionKey}')">
     <div class="clt-main">
       <span style="cursor:${isEditing?'default':'grab'};color:#283548;font-size:12px;flex-shrink:0;user-select:none" title="${isEditing?'':'Arrastar'}">⠿</span>
+      ${typeof _taskNum!=='undefined'&&_taskNum>=0?`<span style="font-size:9px;color:#334155;min-width:14px;text-align:right;flex-shrink:0;font-weight:600">${_taskNum+1}</span>`:''}
       <input type="checkbox" class="clt-chk" id="ck-${tid}" ${chk?"checked":""} ${dis?"disabled":""}
              onchange="toggleCk('${tid}',this.checked,'${activeStage}')">`;
   if(isEditing){
     h+=`<input class="task-edit-inp" id="editInp-${tid}" value="${(task.tx||'').replace(/"/g,'&quot;')}"
           onkeydown="if(event.key==='Enter')saveTaskText('${tid}','${activeStage}',${isCustom});if(event.key==='Escape')cancelEditTask()">`;
   } else {
-    h+=`<span class="clt-txt editable${chk?" completed":""}" onclick="startEditTask('${tid}')">${task.tx}</span>`;
+    // Use global override → per-card override → task default text
+    const _globalTxt=(typeof getGlobalTaskText==='function'?getGlobalTaskText():{})[tid];
+    const _displayTxt=_globalTxt||(p.taskText||{})[tid]||task.tx||tid;
+    h+=`<span class="clt-txt editable${chk?" completed":""}" onclick="startEditTask('${tid}')">${_displayTxt}</span>`;
   }
   h+=`<div class="clt-btns">`;
   if(!isEditing){
@@ -4815,9 +4912,17 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds){
       <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
       <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
     </select>`;
-    if(isCustom) h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>
-      <button onclick="promoteTaskToDefault('${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}')" title="Tornar tarefa padrão neste stage"
-        style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:1px 3px" title="Tornar padrão">🌟</button>`;
+    if(isCustom){
+      h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>
+      <button onclick="promoteTaskToDefault('${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}')"
+        style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:1px 3px" title="Tornar padrão neste stage">🌟</button>`;
+    } else {
+      // Tarefa padrão ou permanente: X que pergunta escopo de remoção
+      const _safeLabel=(task.tx||tid).substring(0,35).replace(/'/g,"\\'");
+      const _isPerm=!!(task.isPermanent);
+      h+=`<button class="del-task-btn" onclick="removeDefaultTask('${tid}','${activeStage}','${_safeLabel}',${_isPerm})"
+        title="Remover (este card ou todos os cards)">✕</button>`;
+    }
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
     h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
     h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
@@ -4910,6 +5015,9 @@ function saveTaskText(tid,stage,isCustom){
       else setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
     }
   } else {
+    // Tarefa padrão: salva globalmente (reflete em todos os cards)
+    setGlobalTaskText(tid,newText);
+    // Também salva no card atual para consistência local
     setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
   }
   taskEditing=null;renderCheck();
