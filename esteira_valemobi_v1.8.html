@@ -4811,9 +4811,10 @@ function renderCheck(){
       ...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),
       ...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))
     ];
-    // Deduplica por TID (evita duplicatas entre permanent + injected + default)
+    // Aplica ordem (global ou per-card), depois deduplica por TID
+    const _orderedAll=_orderToApply?applyTaskOrder(allSecTasksUnordered,_orderToApply):allSecTasksUnordered;
     const _seenSecTids=new Set();
-    const allSecTasks=allSecTasksUnordered.filter(t=>{
+    const allSecTasks=_orderedAll.filter(t=>{
       if(_seenSecTids.has(t.id))return false;_seenSecTids.add(t.id);return true;
     });
     const taskIds=allSecTasks.map(t=>t.id);
