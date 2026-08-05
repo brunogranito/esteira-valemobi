@@ -3400,10 +3400,10 @@ function addTaskLink(tid){
   const urlEl=document.getElementById('trl-url-'+tid);
   const name=(nameEl?.value||'').trim();
   const url=(urlEl?.value||'').trim();
-  if(!url){showToast('Informe a URL','');return;}
+  if(!name&&!url){showToast('Preencha ao menos o nome','');return;}
   const p=getP(selId);if(!p)return;
   const taskLinks={...(p.taskLinks||{})};
-  taskLinks[tid]=[...(taskLinks[tid]||[]),{name:name||url,url}];
+  taskLinks[tid]=[...(taskLinks[tid]||[]),{name:name||url,url:url||''}];
   setP(selId,{taskLinks});
   if(nameEl)nameEl.value='';if(urlEl)urlEl.value='';
   renderCheck();
@@ -3434,7 +3434,7 @@ function renderTaskRef(p,tid,task){
   return `<div id="task-ref-${tid}" style="display:none;margin:5px 0 4px 22px;padding:8px 10px;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:6px;font-size:10px">
     ${totalAll===0?'':`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">`+
       allLinks.map(l=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);padding:2px 8px;border-radius:4px;font-size:10px">
-        <a href="${l.url}" target="_blank" style="color:#38bdf8;text-decoration:none">🔗 ${l.name}</a>
+        ${l.url?`<a href="${l.url}" target="_blank" style="color:#38bdf8;text-decoration:none">🔗 ${l.name}</a>`:`<span style="color:#94a3b8">📎 ${l.name}</span>`}
         <button onclick="editTaskLink('${tid}',${l.isDefault?l.dIdx:-1},${l.isDefault?1:0},${l.isDefault?l.dIdx:(l.uIdx||0)})" title="Editar"
           style="background:none;border:none;color:#475569;cursor:pointer;font-size:10px;padding:0 1px">✏</button>
         ${l.isDefault?'':'<button onclick="removeTaskLink(\''+tid+'\',' +(l.uIdx||0) +')" style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:0 1px">×</button>'}
@@ -4811,8 +4811,11 @@ function renderCheck(){
       ...permanentInSec.map(t=>({id:t.tid,tx:t.tx,isPermanent:true})),
       ...injectedInSec.map(t=>({id:t.tid,tx:t.tx,isInjected:true}))
     ];
-    // Se há ordem salva com IDs de injetados, reaplica sobre todos
-    const allSecTasks=taskOrder?applyTaskOrder(allSecTasksUnordered,taskOrder):allSecTasksUnordered;
+    // Deduplica por TID (evita duplicatas entre permanent + injected + default)
+    const _seenSecTids=new Set();
+    const allSecTasks=allSecTasksUnordered.filter(t=>{
+      if(_seenSecTids.has(t.id))return false;_seenSecTids.add(t.id);return true;
+    });
     const taskIds=allSecTasks.map(t=>t.id);
     // Store for drag-drop
     _sectionTaskIds[active+'|||'+sec.s]=taskIds;
