@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Esteira Valemobi — RV · v1.7</title>
+<title>Esteira Valemobi — RV · v1.8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
@@ -443,7 +443,7 @@ body.light .mtg-notes{color:#334155}
 
 
 /* ── LOGIN SCREEN ───────────────────────────────── */
-#loginScreen{display:none!important;position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f3460 100%);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px}
+#loginScreen{display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f3460 100%);z-index:2000;align-items:center;justify-content:center;padding:20px}
 .login-box{background:#1e293b;border:1px solid rgba(6,182,212,.25);border-radius:16px;padding:36px 32px;width:min(400px,100%);box-shadow:0 24px 48px rgba(0,0,0,.7)}
 .login-logo{font-size:36px;margin-bottom:6px;text-align:center}
 .login-title{font-size:22px;font-weight:800;text-align:center;background:linear-gradient(90deg,#06b6d4,#14b8a6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
@@ -703,7 +703,7 @@ body.light .paci-name{color:#1e293b}
       <button class="sidebar-toggle" onclick="openSidebar()" title="Menu">☰</button>
       <div>
         <div class="app-title">⚡ Esteira Valemobi — RV</div>
-        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.7</span></div>
+        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#475569">v1.8</span></div>
       </div>
     </div>
     <!-- MULTI-SELECT BAR -->
@@ -2098,19 +2098,24 @@ function addDep(did){if(!did)return;const p=getP(selId);const deps=[...(p.deps||
 function removeDep(did){const p=getP(selId);setP(selId,{deps:(p.deps||[]).filter(d=>d!==did)});renderDeps();}
 
 // ── REAL-TIME POLLING (30s) ─────────────────────────
+// Busca updated_at direto da row de esteira_data (não do value/projetos)
 let lastSbCheck=Date.now();
 setInterval(async()=>{
   if(document.hidden)return;
   try{
-    const remote=await sbGet('projects');
-    if(remote?.length){
-      const remoteTime=new Date(remote[0]?.updated_at||0).getTime()||0;
-      if(remoteTime>lastSbCheck){
+    const r=await sbFetch('esteira_data?id=eq.projects&select=value,updated_at');
+    if(!r.ok)return;
+    const d=await r.json();
+    if(!d?.[0])return;
+    const remoteTime=new Date(d[0].updated_at||0).getTime()||0;
+    if(remoteTime>lastSbCheck){
+      const remote=d[0].value;
+      if(remote?.length){
         projects=remote;lsSet('projects',projects);
         renderBoard();renderStats();
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
         setSbBadge('synced',`☁ Atualizado às ${now} <span class="sync-dot active"></span>`);
-        lastSbCheck=Date.now();
+        lastSbCheck=remoteTime;
       }
     }
   }catch(e){}
@@ -2293,7 +2298,7 @@ function renderMsConfig(){
     <div style="font-size:11px;color:#64748b;line-height:1.7;margin-bottom:16px;background:rgba(15,23,42,.5);padding:12px;border-radius:7px">
       1. Acesse <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" style="color:#38bdf8">portal.azure.com</a> → Azure Active Directory → App registrations<br>
       2. <strong style="color:#e2e8f0">New registration</strong> → Nome: "Esteira Valemobi"<br>
-      3. Redirect URI: <code style="background:rgba(6,182,212,.1);padding:1px 6px;border-radius:3px;color:#06b6d4">https://brunogranito.github.io/esteira-valemobi/esteira_valemobi_v1.5.html</code><br>
+      3. Redirect URI: <code style="background:rgba(6,182,212,.1);padding:1px 6px;border-radius:3px;color:#06b6d4">https://brunogranito.github.io/esteira-valemobi/</code><br>
       4. Copie <strong style="color:#e2e8f0">Application (client) ID</strong> e <strong style="color:#e2e8f0">Directory (tenant) ID</strong><br>
       5. Em <strong style="color:#e2e8f0">API permissions</strong> → Add → Microsoft Graph → Delegated:<br>
       &nbsp;&nbsp;&nbsp;• User.Read · Mail.Read · Mail.Send · Calendars.Read · Calendars.ReadWrite
@@ -4518,7 +4523,7 @@ function fireBrowserNotif(title,body){
     new Notification(title,{body,icon:"⚡"});
   }
 }
-// checkReminders: v1.7 version defined earlier
+// checkReminders: defined earlier
 
 function findTaskText(p,tid){
   for(const stage of Object.keys(CL)){
@@ -4754,7 +4759,7 @@ function confirmDelete(id){
 }
 
 /* ── LINK MANAGEMENT ────────────────────────────────── */
-// openLinkModal: v1.7 version defined earlier
+// openLinkModal: defined earlier
 
 function closeLinkModal(){document.getElementById("linkModal").classList.remove("open");}
 function saveLinkModal(){
@@ -5436,7 +5441,7 @@ body.light .mtg-notes{color:#334155}
 
 
 /* ── LOGIN SCREEN ───────────────────────────────── */
-#loginScreen{display:none!important;position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f3460 100%);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px}
+#loginScreen{display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f3460 100%);z-index:2000;align-items:center;justify-content:center;padding:20px}
 .login-box{background:#1e293b;border:1px solid rgba(6,182,212,.25);border-radius:16px;padding:36px 32px;width:min(400px,100%);box-shadow:0 24px 48px rgba(0,0,0,.7)}
 .login-logo{font-size:36px;margin-bottom:6px;text-align:center}
 .login-title{font-size:22px;font-weight:800;text-align:center;background:linear-gradient(90deg,#06b6d4,#14b8a6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
@@ -5770,31 +5775,77 @@ async function initApp(){
   // ── 2. SINCRONIZAR COM SUPABASE EM BACKGROUND (sem bloquear) ──
   setSbBadge('syncing','Sincronizando…');
   try{
-    const timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),7000));
-    const [sbProjects,sbOrders,sbJiraCfg]=await Promise.race([
-      Promise.all([sbGet('projects'),sbGet('orders'),sbGet('jira_cfg')]),
+    const timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000));
+    const [
+      sbProjects,sbOrders,sbJiraCfg,
+      sbGlobalTaskText,sbGlobalTaskOrder,sbGlobalRemovedTasks,
+      sbPermanentTasks,sbStandaloneTasks,
+      sbMenuSystems,sbMenuPeople,sbBuildHistory
+    ]=await Promise.race([
+      Promise.all([
+        sbGet('projects'),sbGet('orders'),sbGet('jira_cfg'),
+        sbGet('globalTaskText'),sbGet('globalTaskOrder'),sbGet('globalRemovedTasks'),
+        sbGet('permanentTasks'),sbGet('standaloneTasks'),
+        sbGet('menu_systems'),sbGet('menu_people'),sbGet('buildHistory')
+      ]),
       timeout.then(()=>{throw new Error('timeout');})
     ]);
 
     let updated=false;
+
+    // ── Projetos
     if(sbProjects?.length){
       projects=sbProjects;lsSet('projects',projects);updated=true;
     } else if(projects.length){
       sbSet('projects',projects).catch(()=>{});
     }
 
+    // ── Ordens
     if(sbOrders&&Object.keys(sbOrders).length){
       stageOrders=sbOrders;lsSet('orders',stageOrders);
     } else if(Object.keys(stageOrders).length){
       sbSet('orders',stageOrders).catch(()=>{});
     }
 
+    // ── Jira config (token fica só no localStorage por segurança)
     if(sbJiraCfg){
       const lj=lsGet('jira')||{};
       jiraConfig={email:lj.email||sbJiraCfg.email||'',token:lj.token||jiraConfig.token||'',
         domain:lj.domain||sbJiraCfg.domain||'valemobi.atlassian.net',
         useProxy:lj.useProxy!==undefined?lj.useProxy:sbJiraCfg.useProxy!==false};
       if(jiraConfig.email)lsSet('jira',jiraConfig);
+    }
+
+    // ── Dados globais de tarefas (só sobrescreve localStorage se Supabase tiver dado)
+    if(sbGlobalTaskText&&Object.keys(sbGlobalTaskText).length)
+      lsSet('globalTaskText',sbGlobalTaskText);
+    if(sbGlobalTaskOrder&&Object.keys(sbGlobalTaskOrder).length)
+      lsSet('globalTaskOrder',sbGlobalTaskOrder);
+    if(sbGlobalRemovedTasks&&Object.keys(sbGlobalRemovedTasks).length)
+      lsSet('globalRemovedTasks',sbGlobalRemovedTasks);
+    if(sbPermanentTasks&&Object.keys(sbPermanentTasks).length)
+      lsSet('permanentTasks',sbPermanentTasks);
+    if(sbStandaloneTasks?.length)
+      lsSet('standaloneTasks',sbStandaloneTasks);
+
+    // ── Menu data (sistemas, pessoas)
+    if(sbMenuSystems?.length){
+      lsSet('menuSystems',sbMenuSystems);
+      menuData.systems=sbMenuSystems;
+    }
+    if(sbMenuPeople?.length){
+      lsSet('menuPeople',sbMenuPeople);
+      menuData.people=sbMenuPeople;
+    }
+
+    // ── Build history
+    if(sbBuildHistory){
+      const lbh=lsGet('buildHistory')||{projetos:[],pods:[]};
+      const merged={
+        projetos:[...new Set([...(sbBuildHistory.projetos||[]),...(lbh.projetos||[])])].slice(0,25),
+        pods:[...new Set([...(sbBuildHistory.pods||[]),...(lbh.pods||[])])].slice(0,25)
+      };
+      lsSet('buildHistory',merged);
     }
 
     if(updated){
