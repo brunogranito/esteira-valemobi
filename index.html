@@ -1741,7 +1741,7 @@ async function syncModalCard(){
   el.innerHTML=`<div class="jira-loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div> Buscando…</div>`;
   let html='';
   for(const code of codes){
-    const issue=await jiraFetch(`issue/${code}?fields=summary,status,assignee,updated,comment`);
+    const issue=await jiraFetch(`issue/${code}?fields=summary,status,assignee,updated,description,comment`);
     if(!issue){html+=`<div class="jira-err" style="font-size:11px">❌ Não foi possível buscar ${code}</div>`;continue;}
     const f=issue.fields;
     const statusName=f?.status?.name||'?';
@@ -1749,22 +1749,61 @@ async function syncModalCard(){
     const sugStage=jiraStage(statusName);
     const assignee=f?.assignee?.displayName||'Não atribuído';
     const updated=f?.updated?new Date(f.updated).toLocaleString('pt-BR'):'?';
-    const comments=(f?.comment?.comments||[]).slice(-2).reverse();
+    const comments=(f?.comment?.comments||[]).slice(-3).reverse();
     const curStageName=STAGES.find(s=>s.id===p.stage)?.label||p.stage;
     const sugStageName=sugStage?STAGES.find(s=>s.id===sugStage)?.label||sugStage:null;
     const diff=sugStage&&sugStage!==p.stage;
+
+    // Extrai texto da descrição (Atlassian Document Format → texto plano)
+    function adfToText(node){
+      if(!node)return'';
+      if(node.type==='text')return node.text||'';
+      if(node.type==='hardBreak')return'\n';
+      const kids=(node.content||[]).map(adfToText).join('');
+      if(['paragraph','heading','listItem','bulletList','orderedList'].includes(node.type))return kids+'\n';
+      return kids;
+    }
+    const jiraDesc=(adfToText(f?.description)||'').trim();
+    if(jiraDesc){
+      // Importa descrição do Jira para o card (acrescenta se já tiver conteúdo diferente)
+      const curDesc=(p.desc||'').trim();
+      const jiraBlock=`[Jira ${code}]\n${jiraDesc}`;
+      if(!curDesc.includes(jiraBlock)){
+        const newDesc=curDesc?curDesc+'\n\n---\n'+jiraBlock:jiraBlock;
+        setP(selId,{desc:newDesc});
+        renderInfo();
+      }
+    }
+
+    // Importa últimos comentários para notas do card
+    if(comments.length){
+      const curNotes=(p.notes||'').trim();
+      const commBlock=comments.map(c=>{
+        const txt=(c.body?.content||[]).map(adfToText).join('').trim().substring(0,300);
+        return `[${c.author?.displayName||'?'}  · ${new Date(c.created).toLocaleDateString('pt-BR')}]\n${txt}`;
+      }).join('\n\n');
+      const commSection=`\n\n--- Comentários Jira (${new Date().toLocaleDateString('pt-BR')}) ---\n${commBlock}`;
+      if(!curNotes.includes(commBlock.substring(0,40))){
+        setP(selId,{notes:(curNotes+commSection).trim()});
+      }
+    }
+
     html+=`<div class="jira-ticket" style="margin-bottom:12px">
       <div class="jira-ticket-header">
         <span class="jira-ticket-key">${code}</span>
         <span class="jira-ticket-status" style="background:${jiraStatusColor(statusCat)}20;color:${jiraStatusColor(statusCat)}">${statusName}</span>
       </div>
       <div class="jira-ticket-meta"><span>👤 ${assignee}</span><span>🕒 ${updated}</span></div>
+      ${jiraDesc?`<div style="margin-top:6px;font-size:10px;color:#64748b;padding:5px 8px;background:rgba(6,182,212,.06);border-left:2px solid rgba(6,182,212,.3);border-radius:0 4px 4px 0;max-height:80px;overflow:hidden">
+        <strong style="color:#475569">📝 Descrição importada para o card</strong>
+      </div>`:''
+      }
       ${diff?`<div class="jira-stage-suggest">
         Sugestão: mover para <strong>${sugStageName}</strong>
         <button class="jira-btn-sec" style="font-size:10px;padding:3px 10px" onclick="applyJiraStage('${p.id}','${sugStage}')">Aplicar</button>
       </div>`:`<div style="font-size:10px;color:#10b981;margin-top:6px">✅ Stage OK (${curStageName})</div>`}
       ${comments.length?`<div style="margin-top:10px;border-top:1px solid rgba(71,85,105,.15);padding-top:8px">
-        <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:6px">Últimos comentários</div>
+        <div style="font-size:10px;font-weight:600;color:#10b981;margin-bottom:6px">💬 ${comments.length} comentário${comments.length>1?'s':''} importado${comments.length>1?'s':''} para Notas</div>
         ${comments.map(c=>`<div style="font-size:10px;color:#94a3b8;margin-bottom:6px;padding-left:8px;border-left:2px solid rgba(71,85,105,.3)">
           <strong style="color:#64748b">${c.author?.displayName||'?'}</strong> · ${new Date(c.created).toLocaleDateString('pt-BR')}<br>
           ${(c.body?.content?.[0]?.content?.[0]?.text||'').substring(0,150)}
@@ -2020,33 +2059,41 @@ function renderMeetings(){
       <div class="people-ac-drop" id="mtgPartDrop"></div>
     </div>
     <textarea class="mtg-inp" rows="3" id="mtgNotes" placeholder="Notas e discussões da reunião…"></textarea>
-    <textarea class="mtg-inp" rows="2" id="mtgDecisions" placeholder="Decisões tomadas…"></textarea>
+    <textarea class="mtg-inp" rows="2" id="mtgDecisions" placeholder="Decisões tomadas… (Enter = nova decisão)"></textarea>
     <div class="save-row"><button class="btn-s" onclick="saveMeeting()">✓ Salvar ata</button><button class="btn-c" onclick="toggleMtgForm()">✕</button></div>
   </div>`;
   if(!meetings.length){h+=`<div class="agenda-empty" style="margin-top:16px">Nenhuma ata registrada ainda.</div>`;}
   else{
     h+=meetings.slice().reverse().map((m,ri)=>{
       const i=meetings.length-1-ri;
+      const dateStr=new Date(m.date+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+      const isOpen=(_mtgExpanded||{})[i];
+      // Decisões: separa por \n, cada linha = uma decisão
+      const decisionsArr=(m.decisions||'').split('\n').map(d=>d.trim()).filter(Boolean);
       return `<div class="mtg-item" id="mtg-item-${i}">
-        <div class="mtg-header">
-          <div>
-            <span class="mtg-date">${new Date(m.date+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})}</span>
+        <div class="mtg-header" onclick="toggleMtgExpand(${i})" style="cursor:pointer;user-select:none">
+          <div style="flex:1">
+            <span class="mtg-date">${dateStr}</span>
             <span class="mtg-participants" style="margin-left:8px">· ${m.participants||''}</span>
+            ${decisionsArr.length?`<span style="margin-left:8px;font-size:9px;color:#10b981;font-weight:600">${decisionsArr.length} decisão${decisionsArr.length!==1?'ões':''}${m.notes?' · notas':''}` :`${m.notes?'<span style="margin-left:8px;font-size:9px;color:#64748b">notas</span>':''}`}
           </div>
-          <div style="display:flex;gap:5px">
+          <div style="display:flex;gap:5px" onclick="event.stopPropagation()">
             <button class="mtg-del" onclick="editMeeting(${i})" title="Editar" style="color:#64748b">✏</button>
             <button class="mtg-del" onclick="deleteMeeting(${i})" title="Remover">🗑</button>
+            <span style="color:#475569;font-size:12px;padding:4px 2px">${isOpen?'▴':'▾'}</span>
           </div>
         </div>
-        ${m.notes?`<div class="mtg-notes">${m.notes}</div>`:''}
-        ${m.decisions?`<div class="mtg-decisions">✅ ${m.decisions}</div>`:''}
-        <div style="border-top:1px solid rgba(71,85,105,.12);margin-top:8px;padding-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          ${renderAttachments(m.attachments||[],'meeting',i)}
-          <button onclick="openFilePicker('meeting',${i})"
-            style="background:rgba(71,85,105,.1);border:1px dashed rgba(71,85,105,.35);color:#64748b;padding:4px 12px;border-radius:5px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
-            📎 Anexar arquivo à ata
-          </button>
-        </div>
+        ${isOpen?`
+          ${m.notes?`<div class="mtg-notes">${m.notes}</div>`:''}
+          ${decisionsArr.length?`<div class="mtg-decisions">${decisionsArr.map(d=>`✅ ${d}`).join('<br>')}</div>`:''}
+          <div style="border-top:1px solid rgba(71,85,105,.12);margin-top:8px;padding-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${renderAttachments(m.attachments||[],'meeting',i)}
+            <button onclick="openFilePicker('meeting',${i})"
+              style="background:rgba(71,85,105,.1);border:1px dashed rgba(71,85,105,.35);color:#64748b;padding:4px 12px;border-radius:5px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+              📎 Anexar arquivo à ata
+            </button>
+          </div>`:''
+        }
       </div>`;
     }).join('');
   }
@@ -2054,6 +2101,8 @@ function renderMeetings(){
   // Init people AC for participant fields
   initPeopleAC('mtgPart','mtgPartDrop');
 }
+let _mtgExpanded={};
+function toggleMtgExpand(i){_mtgExpanded[i]=!_mtgExpanded[i];renderMeetings();}
 function toggleMtgForm(){ const f=document.getElementById('mtgForm'); f?.classList.toggle('open'); if(f?.classList.contains('open')) initPeopleAC('mtgPart','mtgPartDrop'); }
 function saveMeeting(){
   const date=document.getElementById('mtgDate')?.value;
@@ -3227,22 +3276,49 @@ function openFilePicker(target,targetId){
     const file=e.target.files[0];
     if(!file)return;
     if(file.size>MAX_ATTACH_KB*1024){showToast('Arquivo grande',`Limite: ${MAX_ATTACH_KB}KB. Use um link externo para arquivos maiores.`);return;}
-    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
-    const attach={name:file.name,type:file.type,data:b64,size:file.size,addedAt:new Date().toISOString()};
-    if(target==='desc'){
-      const p=getP(selId);
-      setP(selId,{descAttachments:[...(p.descAttachments||[]),attach]});
-      renderInfo();
-    } else if(target==='meeting'){
-      const p=getP(selId);
-      const meetings=[...(p.meetings||[])];
-      if(!meetings[targetId])return;
-      meetings[targetId].attachments=[...(meetings[targetId].attachments||[]),attach];
-      setP(selId,{meetings});renderMeetings();
-    }
-    showToast('✅ Anexo adicionado',file.name);
+    await _processAttachFile(file,target,targetId);
   };
   inp.click();
+}
+
+async function _processAttachFile(file,target,targetId){
+  if(file.size>MAX_ATTACH_KB*1024){showToast('Arquivo grande',`Limite: ${MAX_ATTACH_KB}KB. Use um link externo para arquivos maiores.`);return;}
+  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+  const attach={name:file.name,type:file.type,data:b64,size:file.size,addedAt:new Date().toISOString()};
+  if(target==='task'){
+    const p=getP(selId);if(!p)return;
+    const ta={...(p.taskAttachments||{})};
+    ta[targetId]=[...(ta[targetId]||[]),{name:file.name,type:file.type,data:b64}];
+    setP(selId,{taskAttachments:ta}); renderCheck();
+  } else if(target==='desc'){
+    const p=getP(selId);
+    setP(selId,{descAttachments:[...(p.descAttachments||[]),attach]});
+    renderInfo();
+  } else if(target==='meeting'){
+    const p=getP(selId);
+    const meetings=[...(p.meetings||[])];
+    if(!meetings[targetId])return;
+    meetings[targetId].attachments=[...(meetings[targetId].attachments||[]),attach];
+    setP(selId,{meetings});renderMeetings();
+  }
+  showToast('✅ Anexo adicionado',file.name);
+}
+
+/* ── DRAG-AND-DROP NA ÁREA DE DESCRIÇÃO ─────────────────── */
+function initDescDropZone(){
+  const btn=document.querySelector('[data-desc-drop]');
+  if(!btn)return;
+  const zone=btn.closest('div');
+  if(!zone||zone._dropInit)return;
+  zone._dropInit=true;
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.style.borderColor='#06b6d4';zone.style.background='rgba(6,182,212,.06)';});
+  zone.addEventListener('dragleave',()=>{zone.style.borderColor='';zone.style.background='';});
+  zone.addEventListener('drop',async e=>{
+    e.preventDefault();zone.style.borderColor='';zone.style.background='';
+    const file=e.dataTransfer.files[0];
+    if(!file)return;
+    await _processAttachFile(file,'desc',0);
+  });
 }
 
 function removeAttachment(target,targetId,attachIdx){
@@ -3489,26 +3565,7 @@ function removeTaskAttach(tid,idx){
   setP(selId,{taskAttachments:ta});renderCheck();
 }
 
-// Override openFilePicker to handle task target
-const _origOpenFilePicker=openFilePicker;
-function openFilePicker(target,targetId){
-  if(target==='task'){
-    const inp=document.createElement('input');
-    inp.type='file'; inp.accept='image/*,.pdf,.doc,.docx,.xlsx,.txt';
-    inp.onchange=async e=>{
-      const file=e.target.files[0]; if(!file)return;
-      if(file.size>500*1024){showToast('Arquivo grande','Limite: 500KB');return;}
-      const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
-      const p=getP(selId);if(!p)return;
-      const ta={...(p.taskAttachments||{})};
-      ta[targetId]=[...(ta[targetId]||[]),{name:file.name,type:file.type,data:b64}];
-      setP(selId,{taskAttachments:ta}); renderCheck();
-      showToast('✅ Arquivo anexado',file.name);
-    };
-    inp.click(); return;
-  }
-  _origOpenFilePicker(target,targetId);
-}
+// openFilePicker: consolidated above (task+desc+meeting handled in _processAttachFile)
 
 /* ── DEFAULT TASK REORDERING ────────────────────────────── */
 function getTaskOrder(p,stageId,sectionS){
@@ -4068,34 +4125,25 @@ function restoreGlobalTask(stageId,tid){
 
 /* ── REMOVE DEFAULT/PERMANENT TASK (pergunta opção) ── */
 function removeDefaultTask(tid,stageId,taskLabel,isPermanent){
-  const choice=confirm(
-    `"${taskLabel}"\n\nComo deseja remover esta tarefa?\n\n`+
-    `• OK = Remover deste card apenas\n`+
-    `• Cancelar = Remover de TODOS os cards desta esteira${isPermanent?' (deixa de ser padrão)':''}`
-  );
-  if(choice){
-    // Só este card: oculta (taskHidden)
-    hideTaskForCard(selId,tid);
-    if(isPermanent){
-      // Também marca N/A neste card pra não contar no progresso
-      const p=getP(selId);
-      setP(selId,{taskHidden:{...(p?.taskHidden||{}),[tid]:true}});
-    }
-  } else {
-    // Todos os cards: remove globalmente
-    if(isPermanent){
-      // Remove de permanentTasks
-      const data=getPermanentTasks();
-      if(data[stageId])data[stageId]=data[stageId].filter(t=>t.tid!==tid);
-      savePermanentTasks(data);
-    } else {
-      // Adiciona à lista de removidos globalmente
+  // Para tarefas padrão (CL), mantém o confirm original de escopo
+  if(!confirm(`Ocultar "${taskLabel}" deste card?`))return;
+  hideTaskForCard(selId,tid);
+  if(!isPermanent){
+    // Pergunta se quer remover de todos os cards também
+    if(confirm(`Remover de TODOS os cards desta esteira?`)){
       removeTaskGlobally(stageId,tid);
     }
-    // Remove deste card também
-    const p=getP(selId);
-    setP(selId,{taskHidden:{...(p?.taskHidden||{}),[tid]:true}});
   }
+  renderCheck();
+}
+
+/* ── UNSET PERMANENT TASK (remove do padrão global) ──────── */
+function unsetPermanentTask(tid,stageId){
+  if(!confirm('Remover esta tarefa do padrão de TODOS os cards?\n\nEla deixará de aparecer automaticamente, mas não será apagada dos cards onde já está.'))return;
+  const data=getPermanentTasks();
+  if(data[stageId])data[stageId]=data[stageId].filter(t=>t.tid!==tid);
+  savePermanentTasks(data);
+  showToast('📌 Removido do padrão','A tarefa não será mais automática neste stage.');
   renderCheck();
 }
 
@@ -4708,12 +4756,15 @@ function renderInfo(){
   const descAttach=renderAttachments(p.descAttachments,'desc',0);
   if(descAttach||true){
     h+=`<div style="margin-top:10px">
-      <button onclick="openFilePicker('desc',0)"
-        style="background:none;border:1px dashed rgba(71,85,105,.3);color:#64748b;padding:5px 12px;border-radius:5px;font-size:10px;cursor:pointer;width:100%">
-        📎 Anexar arquivo à descrição (máx 500KB)
-      </button>
+      <div data-desc-drop style="border:1px dashed rgba(71,85,105,.3);border-radius:5px;padding:5px 12px;text-align:center;transition:all .2s">
+        <button onclick="openFilePicker('desc',0)"
+          style="background:none;border:none;color:#64748b;font-size:10px;cursor:pointer;width:100%">
+          📎 Clique para anexar ou arraste o arquivo aqui (máx 500KB)
+        </button>
+      </div>
       ${descAttach}
     </div>`;
+    setTimeout(initDescDropZone,50);`;
   }
 
   h+=`<div style="display:flex;gap:8px;margin-top:14px">
@@ -4930,15 +4981,26 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds,_taskNum
       <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
     </select>`;
     if(isCustom){
-      h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>
-      <button onclick="promoteTaskToDefault('${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}')"
-        style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:1px 3px" title="Tornar padrão neste stage">🌟</button>`;
+      // Verifica se já foi promovida (está em permanentTasks)
+      const _alreadyPerm=!!(getPermanentTasks()[activeStage]||[]).find(t=>t.tid===tid);
+      h+=`<button class="del-task-btn" onclick="deleteCustomTask('${tid}','${activeStage}')" title="Remover">✕</button>`;
+      if(_alreadyPerm){
+        h+=`<button onclick="unsetPermanentTask('${tid}','${activeStage}')"
+          style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:11px;padding:1px 3px" title="Remover do padrão">📌</button>`;
+      } else {
+        h+=`<button onclick="promoteTaskToDefault('${tid}','${activeStage}','${(sectionS||'').replace(/'/g,"\\'")}')"
+          style="background:none;border:none;color:#475569;cursor:pointer;font-size:11px;padding:1px 3px" title="Tornar padrão neste stage">🌟</button>`;
+      }
     } else {
-      // Tarefa padrão ou permanente: X que pergunta escopo de remoção
-      const _safeLabel=(task.tx||tid).substring(0,35).replace(/'/g,"\\'");
+      // Tarefa padrão (CL) ou permanente: botão X + botão 📌 se for permanente
+      const _safeLabel=(task.tx||tid).substring(0,35).replace(/'/g,"\\'").replace(/"/g,'&quot;');
       const _isPerm=!!(task.isPermanent);
       h+=`<button class="del-task-btn" onclick="removeDefaultTask('${tid}','${activeStage}','${_safeLabel}',${_isPerm})"
-        title="Remover (este card ou todos os cards)">✕</button>`;
+        title="Ocultar desta card">✕</button>`;
+      if(_isPerm){
+        h+=`<button onclick="unsetPermanentTask('${tid}','${activeStage}')"
+          style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:11px;padding:1px 3px" title="Remover do padrão (todos os cards)">📌</button>`;
+      }
     }
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
     h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
