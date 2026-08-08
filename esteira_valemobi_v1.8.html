@@ -976,6 +976,7 @@ const STAGES=[
   {id:"descoberta",label:"Descob./Refin.",icon:"🔍",color:"#06b6d4"},
   {id:"dev",       label:"Dev",        icon:"⚙️",color:"#f59e0b"},
   {id:"qa",        label:"QA",         icon:"✅",color:"#ef4444"},
+  {id:"prerdm",    label:"Pré-RDM",    icon:"🎯",color:"#f43f5e"},
   {id:"homolog",   label:"Homologação",icon:"🏠",color:"#3b82f6"},
   {id:"rdm",       label:"RDM",        icon:"🚀",color:"#8b5cf6"},
   {id:"posrdm",    label:"Pós-RDM",   icon:"📊",color:"#6366f1"},
@@ -1036,6 +1037,26 @@ const CL={
       {id:"q1",tx:"Direcionar demanda para equipe de QA realizar testes definitivos"},
       {id:"q2",tx:"Solicitar evidências ao QA sobre os testes realizados"},
       {id:"q3",tx:"Receber aprovação formal do QA — demanda disponível para RDM"},
+    ]},
+  ],
+  prerdm:[
+    {s:"1. Validação final de QA",t:[
+      {id:"pr01",tx:"Confirmar aprovação final de QA para avançar",
+       info:"Verificar se todos os casos de teste foram executados e aprovados."},
+      {id:"pr02",tx:"Receber evidências de aprovação de QA por e-mail"},
+      {id:"pr03",tx:"Validar ausência de bloqueadores críticos abertos"},
+    ]},
+    {s:"2. Preparação do Pacote",t:[
+      {id:"pr04",tx:"Solicitar número da Build ao Dev responsável",
+       links:[{n:"TFS / Azure DevOps (Builds)",u:TFS}]},
+      {id:"pr05",tx:"Confirmar versão e ambiente (Alpha/TI → TH)"},
+      {id:"pr06",tx:"Solicitar RITM de Rollback ao Dev (conforme modelo Ageu)",
+       links:[{n:"Abrir RITM",u:RITM}]},
+    ]},
+    {s:"3. Aprovação para Homologação",t:[
+      {id:"pr07",tx:"Enviar pacote e evidências para Ágora/Bradesco para aprovação"},
+      {id:"pr08",tx:"Validar aprovação Ágora/Bradesco para agendar Homologação"},
+      {id:"pr09",tx:"Agendar data e horário de Homologação com equipe Ágora/Bradesco"},
     ]},
   ],
   homolog:[
@@ -1321,7 +1342,7 @@ const JIRA_MAP = {
   'backlog':'escopo','to do':'escopo','a fazer':'escopo',
   'selected for development':'descoberta','refinamento':'descoberta','em refinamento':'descoberta',
   'in progress':'dev','em andamento':'dev','em desenvolvimento':'dev','desenvolvimento':'dev',
-  'code review':'qa','in review':'homolog','em revisão':'homolog',
+  'code review':'qa','in review':'prerdm','em revisão':'prerdm','in homolog':'homolog','em homologação':'homolog',
   'homologação vm':'homolog','homologação':'homolog','uat':'homolog',
   'testing':'qa','em teste':'qa','qa':'qa','testes':'qa',
   'ready for deploy':'rdm','aguardando implantação':'rdm','rdm':'rdm',
@@ -3153,7 +3174,8 @@ function renderBuildInfo(){
   const p=getP(selId);if(!p)return;
   const stageIdx=STAGES.findIndex(s=>s.id===p.stage);
   const homologIdx=STAGES.findIndex(s=>s.id==='homolog');
-  if(stageIdx<homologIdx)return''; // só mostra a partir de Homologação
+  const prerdmIdx=STAGES.findIndex(s=>s.id==='prerdm');
+  if(stageIdx<Math.min(homologIdx,prerdmIdx))return''; // mostra a partir de Pré-RDM
 
   const builds=p.builds||[{projeto:'',pod:'',build:''}];
   let h=`<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(71,85,105,.2)">
