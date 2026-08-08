@@ -5818,6 +5818,24 @@ async function initApp(){
 }
 
 
+
+/* ── MIGRAÇÃO ÚNICA: corrige globalTaskOrder e globalTaskText pós-reestruturação CL ── */
+(()=>{
+  // Fix globalTaskOrder: renomeia "Preparação para RDM" → "Preparação para Homologação"
+  const gto = lsGet('globalTaskOrder')||{};
+  if(gto.homolog && gto.homolog['Preparação para RDM'] && !gto.homolog['Preparação para Homologação']){
+    gto.homolog['Preparação para Homologação'] = gto.homolog['Preparação para RDM'].filter(id=>['ct_1786032963266','ct_1786032842477','ct_1785940783623','h1','h2'].includes(id));
+    delete gto.homolog['Preparação para RDM'];
+    lsSet('globalTaskOrder', gto);
+  }
+  // Fix globalTaskText: remove override de h2 (era tarefa antiga)
+  const gtt = lsGet('globalTaskText')||{};
+  if(gtt.h2 === 'Realizar testes preliminares em TH'){
+    delete gtt.h2;
+    lsSet('globalTaskText', gtt);
+  }
+})();
+
 /* ── BOOTSTRAP — inicia direto, sem login ─── */
 (()=>{
   // Esconde login se existir
