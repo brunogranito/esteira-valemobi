@@ -995,159 +995,140 @@ const RITM_C="https://wwwcasb.itbm.bancobradescosa.myshn.net/now/nav/ui/classic/
 const CL={
   escopo:[
     {s:"Recebimento e Análise",t:[
-      {id:"e1",tx:"Receber documento preliminar de escopo da Ágora/Bradesco ou Diretoria"},
-      {id:"e2",tx:"Analisar e julgar alinhamento com plataformas existentes"},
-      {id:"e3",tx:"Desenhar escopo inicial — macrovisão da demanda"},
+      {id:"e1",tx:"Receber documento preliminar de escopo da Ágora/Bradesco ou Diretoria Valemobi"},
+      {id:"e2",tx:"Analisar e julgar alinhamento com plataformas existentes Valemobi"},
+      {id:"e3",tx:"Desenhar escopo inicial, macrovisão da demanda"},
+      {id:"e4",tx:"Realizar benchmark com plataformas externas"},
     ]},
-    {s:"Estimativa de Horas",t:[
-      {id:"e4",tx:"Estabelecer quantidade de horas com Dev (Pontes / Bispo)"},
-      {id:"e5",tx:"Enviar estimativa para aprovação Ágora/Bradesco"},
+    {s:"Formalização do Escopo",t:[
+      {id:"e5",tx:"Revisão da US Preliminar"},
     ]},
   ],
   aguardando:[
+    {s:"Estimativa de Horas",t:[
+      {id:"ag1",tx:"Estabelecer quantidade de horas com a equipe de Dev"},
+      {id:"ag2",tx:"Estabelecer quantidade de horas com a equipe de QA"},
+      {id:"ag3",tx:"Enviar estimativa de horas para aprovação do PO e Negócios da Ágora/Bradesco"},
+    ]},
     {s:"Aguardando Retorno",t:[
-      {id:"ag1",tx:"Acompanhar retorno da Ágora/Bradesco sobre a estimativa de horas"},
-      {id:"ag2",tx:"Registrar aprovação formal recebida"},
-      {id:"ag3",tx:"Avançar para Descoberta/Refinamento com aprovação em mãos"},
+      {id:"ag4",tx:"Acompanhar retorno da Ágora/Bradesco sobre a aprovação da estimativa de horas"},
+      {id:"ag5",tx:"Avançar para Descoberta/Refinamento com aprovação em mãos"},
     ]},
   ],
   descoberta:[
     {s:"User Stories",t:[
-      {id:"d1",tx:"Escrever as USs referentes ao projeto"},
-      {id:"d2",tx:"Marcar agenda de Descoberta/Refinamento das USs"},
-      {id:"d3",tx:"Enviar USs para aprovação Ágora/Bradesco"},
-      {id:"d4",tx:"Registrar aprovação das USs"},
+      {id:"d1",tx:"Marcar agenda de Descoberta/Refinamento das USs"},
+      {id:"d2",tx:"Enviar USs finais para aprovação Ágora/Bradesco"},
+      {id:"d3",tx:"Registrar recebimento de aprovação formal das USs"},
     ]},
     {s:"Jira e Confluence",t:[
-      {id:"d5",tx:"Abrir Épico no Jira (BAPG ou BAPD)"},
-      {id:"d6",tx:"Incluir as USs no Confluence"},
-      {id:"d7",tx:"Direcionar demanda para Dev produzir"},
-      {id:"d8",tx:"Incluir estimativa de horas de DS e QA nos comentários"},
+      {id:"d4",tx:"Abrir Épico no Jira (BAPG ou BAPD)"},
+      {id:"d5",tx:"Incluir as USs no Confluence e vincular à task"},
+      {id:"d6",tx:"Direcionar demanda para um Dev produzir"},
+      {id:"d7",tx:"Incluir estimativa de horas de PO e QA nos comentários"},
+    ]},
+    {s:"Encaminhamento para Dev",t:[
+      {id:"d8",tx:"Alinhar cronograma e prazo de entrega com o Dev responsável"},
+      {id:"d9",tx:"Registrar início do desenvolvimento no Jira"},
     ]},
   ],
   dev:[
     {s:"Acompanhamento",t:[
-      {id:"v1",tx:"Acompanhar tickets e progresso no Jira"},
-      {id:"v2",tx:"Verificar em Alpha/TI se o escopo está de acordo com as USs (testes preliminares)"},
-      {id:"v3",tx:"Dev sinaliza conclusão — liberar para QA"},
+      {id:"v1",tx:"Acompanhar evolução dos status da task e progresso no Jira"},
+      {id:"v2",tx:"Checar com o Dev se a demanda já subiu para os ambientes Alpha/TI"},
+      {id:"v3",tx:"Verificar em Alpha/TI se o escopo está de acordo com as USs (testes preliminares)"},
+      {id:"v4",tx:"Verificar se há bloqueadores impedindo o Dev de avançar"},
+      {id:"v5",tx:"Dev sinaliza conclusão — liberar para QA"},
+      {id:"v6",tx:"Atualizar status no Jira para 'Em QA' após conclusão do Dev"},
     ]},
   ],
   qa:[
     {s:"Testes",t:[
       {id:"q1",tx:"Direcionar demanda para equipe de QA realizar testes definitivos"},
-      {id:"q2",tx:"Solicitar evidências ao QA sobre os testes realizados"},
-      {id:"q3",tx:"Receber aprovação formal do QA — demanda disponível para RDM"},
+      {id:"q2",tx:"Marcar reunião de alinhamento com o QA sobre os testes da demanda"},
+      {id:"q3",tx:"Acompanhar diariamente evolução dos testes com o QA"},
+      {id:"q4",tx:"Solicitar evidências ao QA sobre os testes realizados - colocar no comentário da task"},
+      {id:"q5",tx:"Receber aprovação formal do QA — demanda disponível para RDM"},
+    ]},
+    {s:"Registro",t:[
+      {id:"q6",tx:"Atualizar status da task no Jira após conclusão dos testes de QA"},
     ]},
   ],
   prerdm:[
-    {s:"1. Validação final de QA",t:[
-      {id:"pr01",tx:"Confirmar aprovação final de QA para avançar",
-       info:"Verificar se todos os casos de teste foram executados e aprovados."},
-      {id:"pr02",tx:"Receber evidências de aprovação de QA por e-mail"},
-      {id:"pr03",tx:"Validar ausência de bloqueadores críticos abertos"},
+    {s:"Agendamento e Alinhamento",t:[
+      {id:"pr01",tx:"Solicitar inclusão da RDM no Quadro de RDMs da VM",
+       info:"• Verificar concorrências com outras RDMs na mesma janela\n• Verificar se está dentro da janela de validação e envio do plano"},
+      {id:"pr02",tx:"Criar Task de RDM no Jira e vincular à Task principal",
+       info:"• Incluir print da demanda no Quadro de RDMs (comentário/anexo)\n• Vincular a Task que gerou a demanda\n• Para Melhorias: associar à Task Pai de RV no BAPG ou BAPD"},
+      {id:"pr03",tx:"Levantar na Daily a possibilidade de RDM e confirmar viabilidade"},
     ]},
-    {s:"2. Preparação do Pacote",t:[
-      {id:"pr04",tx:"Solicitar número da Build ao Dev responsável",
+    {s:"Preparação do Pacote",t:[
+      {id:"pr04",tx:"Solicitar empacotamento da demanda ao Dev responsável para TH"},
+      {id:"pr05",tx:"Solicitar número da Build ao Dev responsável",
        links:[{n:"TFS / Azure DevOps (Builds)",u:TFS}]},
-      {id:"pr05",tx:"Confirmar versão e ambiente (Alpha/TI → TH)"},
-      {id:"pr06",tx:"Solicitar RITM de Rollback ao Dev (conforme modelo Ageu)",
-       links:[{n:"Abrir RITM",u:RITM}]},
-    ]},
-    {s:"3. Aprovação para Homologação",t:[
-      {id:"pr07",tx:"Enviar pacote e evidências para Ágora/Bradesco para aprovação"},
-      {id:"pr08",tx:"Validar aprovação Ágora/Bradesco para agendar Homologação"},
-      {id:"pr09",tx:"Agendar data e horário de Homologação com equipe Ágora/Bradesco"},
+      {id:"pr06",tx:"Confirmar com Dev número/versão exato da Build antes do RITM"},
+      {id:"pr07",tx:"Abrir RITM para enviar Build para ambiente TH",
+       info:"CAMINHOS (Favoritos no RITM):\n→ Valemobi                 ← deploy de builds (PRINCIPAL)\n→ PostgreSQL              ← consultas e scripts\n→ Criar customizações     ← novos serviços (pouco utilizado)\n→ Bil                     ← Tesouro Direto\n→ Oracle                  ← consultas Sinacor/Bradesco\n\nCONSULTAR RITM DE OUTROS:\nPesquisar RITM > Tarefas de catálogo > Número (clicar)",
+       links:[{n:"Abrir RITM",u:RITM},{n:"Consultar RITMs",u:RITM_C}]},
+      {id:"pr08",tx:"Verificar que a Build de implantação está disponível em TH (TFS)",
+       links:[{n:"TFS — Verificar TH",u:TFS}]},
+      {id:"pr09",tx:"Comunicar equipe Ágora/Bradesco sobre disponibilidade em TH para Homologação (e-mail com evidências)"},
     ]},
   ],
   homolog:[
-    {s:"Preparação para RDM",t:[
-      {id:"h1",tx:"Verificar Build disponível em TI e TH (TFS)",
-       info:"Confirmar com Dev o número/versão exato da Build.",
+    {s:"Preparação para Homologação",t:[
+      {id:"h1",tx:"Agendar data e horário de Homologação com equipe Ágora/Bradesco"},
+      {id:"h2",tx:"Verificar Builds atualizadas disponíveis em TH (TFS)",
        links:[{n:"TFS Pipelines",u:TFS}]},
-      {id:"h2",tx:"Realizar testes preliminares em Alpha/TI"},
-      {id:"h3",tx:"Validar aprovação Ágora/Bradesco para avançar com RDM"},
+    ]},
+    {s:"Homologar",t:[
+      {id:"h3",tx:"Participar dos testes de Homologação junto com Ágora/Bradesco, garantindo cobertura completa da demanda"},
+      {id:"h4",tx:"Solicitar retorno dos testes de homologação, com evidências em TH"},
     ]},
   ],
   rdm:[
-    {s:"1. Levantamento de Build",t:[
-      {id:"r1",tx:"Levantar Builds e Serviços que compõem o Projeto",
-       info:"• Solicitar ao Dev se não constar nos comentários da Task\n• Conferir se a Build está nos ambientes TI e TH via TFS",
-       links:[{n:"TFS — Verificar Builds",u:TFS}]},
-    ]},
-    {s:"2. QA",t:[
-      {id:"r2",tx:"Mandar para QA realizar os testes",
-       info:"Passar para o Wesley (líder QA), que indicará quem será o responsável."},
-    ]},
-    {s:"3. Quadro de RDMs VM",t:[
-      {id:"r3",tx:"Solicitar inclusão da RDM no Quadro de RDMs da VM",
-       info:"• Verificar concorrências com outras RDMs na mesma janela\n• Verificar se está dentro da janela de validação e envio do plano"},
-    ]},
-    {s:"4. Task de RDM no Jira",t:[
-      {id:"r4",tx:"Criar Task de RDM no Jira",
-       info:"• Incluir print da demanda no Quadro de RDMs (comentário/anexo)\n• Vincular a Task que gerou a demanda\n• Para Melhorias: associar à Task Pai de RV no BAPG ou BAPD"},
-    ]},
-    {s:"5. Build de Implantação + RITM",t:[
-      {id:"r5",tx:"Pedir ao Dev gerar Build de implantação (empacotamento)"},
-      {id:"r6",tx:"Abrir RITM para enviar Build para ambiente TH",
-       info:"CAMINHOS (Favoritos no RITM):\n→ Valemobi                 ← deploy de builds (PRINCIPAL)\n→ PostgreSQL              ← consultas e scripts\n→ Criar customizações     ← novos serviços (pouco utilizado)\n→ Bil                     ← Tesouro Direto\n→ Oracle                  ← consultas Sinacor/Bradesco\n\nCONSULTAR RITM DE OUTROS:\nPesquisar RITM > Tarefas de catálogo > Número (clicar)",
-       links:[{n:"Abrir RITM",u:RITM},{n:"Consultar RITMs",u:RITM_C}]},
-      {id:"r7",tx:"Controlar envio de Build para TH (Excel ou comentário da Task RDM)"},
-    ]},
-    {s:"6. Verificação em TH",t:[
-      {id:"r8",tx:"Verificar que a Build de implantação está em TH (TFS)",
-       links:[{n:"TFS — Verificar TH",u:TFS}]},
-    ]},
-    {s:"7. Amadurecimento e Testes TH",t:[
-      {id:"r9",tx:"Amadurecer na Daily sobre a possível RDM"},
-      {id:"r10",tx:"E-mail para DS (Bispo, Gabriel, Pontes) avisando que está em TH para ensaio",
-       info:"Usar modelo de e-mail padrão da Caixa de E-mail."},
-      {id:"r11",tx:"Solicitar retorno dos testes com evidências em TH"},
-    ]},
-    {s:"8. Ficha e Plano de Implantação",t:[
+    {s:"Preparação para a RDM",t:[
       {id:"r12",tx:"Abrir RITM de Rollback e quantidade de Pods (conforme modelo Ageu)",
        info:"• Incluir prints da RITM de Rollback no comentário da Task de RDM\n• Quando o Pod retornar vazio: verificar com o Dev antes de prosseguir",
        links:[{n:"Abrir RITM (Rollback)",u:RITM},{n:"Consultar RITMs",u:RITM_C}]},
+      {id:"r15",tx:"Confirmar participação do Dev responsável para o dia da RDM"},
+      {id:"r16",tx:"Verificar necessidade de participação do QA dependendo da demanda para o dia da RDM"},
+    ]},
+    {s:"Ficha e Plano de Implantação",t:[
       {id:"r13a",tx:"Confeccionar Ficha de Implantação",
        info:"Colocar no comentário da Task e solicitar validação do Dev responsável."},
-      {id:"r13b",tx:"Confeccionar Plano de Importação",
+      {id:"r13b",tx:"Confeccionar Plano de Implantação",
        info:"Colocar no comentário da Task e solicitar validação do Dev responsável."},
-      {id:"r14",tx:"Enviar Ficha e Plano para Ágora/Bradesco",
+      {id:"r14a",tx:"Adicionar Ficha e Plano de Implantação no comentário da Task de RDM e solicitar aprovação do Dev responsável"},
+      {id:"r14b",tx:"Enviar Ficha e Plano de Implantação para a equipe da Ágora/Bradesco",
        info:"• Itens mergeados com nosso pacote → copiar analistas internos + POs no e-mail\n• Nosso pacote mergeado com outros → enviar só a ficha ao responsável pela RDM"},
     ]},
-    {s:"9. Confirmações Pré-RDM",t:[
-      {id:"r15",tx:"Confirmar participação do Dev responsável — com antecedência e no dia"},
-      {id:"r16",tx:"Verificar necessidade de participação do QA dependendo da demanda"},
+    {s:"Confirmação da RDM",t:[
+      {id:"r17",tx:"Verificar com Negócios e PO da Ágora/Bradesco se abriram a Change de RDM e se a RDM está confirmada"},
+      {id:"r18",tx:"Participar da reunião diária de alinhamento de RDMs com Ágora/Bradesco até o dia da implantação"},
     ]},
-    {s:"10. Dia da RDM",t:[
-      {id:"r17",tx:"Solicitar link da Sala caso não recebido"},
-      {id:"r18",tx:"Aguardar na fila para implantação da build/script"},
-      {id:"r19",tx:"Entrar na sala de testes com Ágora/Bradesco após implantação",
+    {s:"Dia da RDM",t:[
+      {id:"r19",tx:"Solicitar link da Sala caso não recebido"},
+      {id:"r20",tx:"Aguardar na fila para implantação da Build/Script"},
+      {id:"r21",tx:"Entrar na sala de testes com Ágora/Bradesco após implantação e realizar os testes em conjunto",
        info:"• Certificar que o Analista fez todos os testes e colheu todas as evidências\n• Idem para o QA da Valemobi, quando aplicável"},
-      {id:"r20",tx:"Aguardar na sala principal até envio do checklist geral"},
-      {id:"r21",tx:"Enviar e-mail de Registro de Ocorrências de Implantação",
+      {id:"r22",tx:"Aguardar na sala principal até envio do checklist geral"},
+      {id:"r23",tx:"Enviar e-mail de Registro de Ocorrências de Implantação",
        info:"Reenviar no dia seguinte caso haja pendência em aberto."},
     ]},
   ],
   posrdm:[
-    {s:"11. Pós-RDM",t:[
-      {id:"r22",tx:"Receber e-mail do cliente com evidências dos testes bem-sucedidos"},
-      {id:"r23",tx:"Abrir RITM para envio da Build/Script para ambiente FIX",
+    {s:"Pós-RDM",t:[
+      {id:"r24",tx:"Receber e-mail do cliente com evidências dos testes bem-sucedidos"},
+      {id:"r25",tx:"Inserir evidências em PROD enviadas no comentário da Task de RDM"},
+      {id:"r26",tx:"Abrir RITM para envio da Build/Script para ambiente FIX",
        links:[{n:"Abrir RITM (FIX)",u:RITM}]},
-      {id:"r24",tx:"Confirmar se Build está no ambiente FIX (TFS)",
+      {id:"r27",tx:"Checar se Builds tiveram deploy em FIX e registrar no comentário da Task",
        links:[{n:"TFS — Verificar FIX",u:TFS}]},
-      {id:"r25",tx:"Colocar print da RITM de FIX no comentário da RDM"},
-      {id:"r26",tx:"Adicionar comentário com resumo da implantação na RDM"},
-      {id:"r27",tx:"Encerrar a RDM como Concluída"},
     ]},
     {s:"Monitoramento",t:[
-      {id:"p1",tx:"Monitorar logs e comportamento em produção"},
-      {id:"p2",tx:"Validar funcionamento com time Ágora/Bradesco"},
-      {id:"p3",tx:"Registrar e encaminhar bugs encontrados"},
-    ]},
-    {s:"Encerramento",t:[
-      {id:"p4",tx:"Post-mortem com o time — lições aprendidas"},
-      {id:"p5",tx:"Documentação final atualizada (Confluence/Jira)"},
-      {id:"p6",tx:"Encerrar todos os tickets no Jira"},
+      {id:"p1",tx:"Registrar no comentário da Task: implantação concluída, data, e participantes (Negócios, Dev e QA)"},
+      {id:"p2",tx:"Encerrar todos os tickets no Jira"},
     ]},
   ],
 };
