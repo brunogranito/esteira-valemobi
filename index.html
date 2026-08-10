@@ -134,7 +134,7 @@ body.tv-mode .tv-clock{display:block}
 
 /* ── INFO TAB ───────────────────────────────────────── */
 .slbl{font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:block}
-.blk-item{display:flex;gap:8px;padding:7px 10px;background:rgba(239,68,68,.1);border-left:2px solid #dc2626;border-radius:4px;margin-bottom:6px;font-size:11px;color:#fca5a5}
+.blk-item{display:flex;gap:8px;padding:7px 10px;background:rgba(217,142,63,.1);border-left:2px solid #D98E3F;border-radius:4px;margin-bottom:6px;font-size:11px;color:#E2A968}
 .nbox{background:rgba(20,21,31,.6);border:1px solid rgba(85,86,106,.25);border-radius:7px;padding:10px 13px;font-size:11px;color:#A5A7B8;line-height:1.7;white-space:pre-wrap;cursor:pointer;transition:border-color .15s}
 .nbox:hover{border-color:rgba(217,142,63,.4)}
 textarea.ea{width:100%;background:rgba(20,21,31,.8);border:1px solid #D98E3F;color:#EDEDF0;padding:9px 11px;border-radius:7px;font-size:11px;line-height:1.7;outline:none;resize:vertical;font-family:inherit}
@@ -395,7 +395,7 @@ body.light .tab{color:#8B8D9B}
 body.light .tab.active{color:#B5701F}
 body.light .ea,.light .jira-inp,.light .link-inp,.light .add-task-inp{background:#fff;border-color:rgba(0,0,0,.2);color:#1C1D28}
 body.light .nbox{background:#fff;border-color:rgba(0,0,0,.12);color:#2C2D3C}
-body.light .blk-item{background:rgba(239,68,68,.08);color:#dc2626}
+body.light .blk-item{background:rgba(217,142,63,.08);color:#8A5A1E}
 body.light .side-panel{background:#F5F3EE;border-color:rgba(0,0,0,.12)}
 body.light .panel-hd{background:linear-gradient(90deg,#2A2117,#4A3B22)}
 body.light .sys-item{background:#fff;border-color:rgba(0,0,0,.1)}
@@ -2015,18 +2015,18 @@ async function generateBriefing(){
   const summary=active.map(p=>{
     const st=STAGES.find(s=>s.id===p.stage);
     const dias=daysInStage(p);
-    return `• ${p.name} (${p.code}): ${st?.label||p.stage}${dias!==null?' ['+dias+'d]':''}, ${p.progress}%${p.blockers?.length?' 🚧':''}`
+    return `• ${p.name} (${p.code}): ${st?.label||p.stage}${dias!==null?' ['+dias+'d]':''}, ${p.progress}%${p.blockers?.length?' 📌':''}`
   }).join('\n');
   const sysPrompt=`Você é o assistente de Bruno Granito, QA RV na Valemobi.
 Hoje: ${today}
 Projetos ativos: ${active.length}
 Urgentes: ${urgentes.map(p=>p.name).join(', ')||'nenhum'}
-Bloqueadas: ${bloqueadas.length}
+Com status atual: ${bloqueadas.length}
 RDM próximos 7 dias: ${rdmHoje.map(p=>p.name+' ('+p.rmdDate+')').join(', ')||'nenhum'}
 Status completo:
 ${summary}`;
   const prompt=`Gere um briefing executivo conciso para hoje com 4 seções:
-1. 🚨 ATENÇÃO IMEDIATA — o que precisa de ação hoje (urgentes, RDMs próximas, bloqueadores críticos)
+1. 🚨 ATENÇÃO IMEDIATA — o que precisa de ação hoje (urgentes, RDMs próximas, status atuais críticos)
 2. 📊 RESUMO DO DIA — visão geral em 3 linhas
 3. ✅ FOCO RECOMENDADO — top 3 ações para hoje em ordem de prioridade
 4. 🔮 OLHANDO PARA A SEMANA — o que vem aí nos próximos 7 dias
@@ -2042,7 +2042,7 @@ Seja objetivo, prático e direto. Use linguagem de BA sênior.`;
     const txt=d.content?.[0]?.text||'Não foi possível gerar o briefing.';
     const parts=txt.split('\n').reduce((acc,line)=>{if(/^[1-4]\.|^[🚨📊✅🔮]/.test(line.trim())){acc.push(line);}else if(acc.length){acc[acc.length-1]+='\n'+line;}return acc;},[]);
     body.innerHTML=`<div style="margin-bottom:12px;padding:10px 12px;background:rgba(217,142,63,.08);border-radius:7px;border-left:2px solid #D98E3F;font-size:11px;color:#8B8D9B">
-      ${active.length} demandas ativas · ${urgentes.length} urgentes · ${bloqueadas.length} bloqueadas · ${rdmHoje.length} RDM esta semana
+      ${active.length} demandas ativas · ${urgentes.length} urgentes · ${bloqueadas.length} com status atual · ${rdmHoje.length} RDM esta semana
     </div>
     ${parts.map(s=>s.trim()?`<div class="brief-section"><div class="brief-content">${s.trim()}</div></div>`:'').join('')}
     <button class="jira-btn-sec" style="width:100%;margin-top:8px" onclick="generateBriefing()">↺ Gerar novamente</button>`;
@@ -4884,7 +4884,7 @@ function renderBoard(){
       });
       const prioK=p.priority;
       const prioBadge=(prioK&&prioK!=="normal")?`<span class="prio-badge ${prioK}">${PRIO[prioK]?.label||prioK}</span>`:"";
-      const blk=p.blockers?.length?`<span class="pill" style="background:rgba(239,68,68,.13);color:rgba(239,68,68,.75)">🚧 ${p.blockers.length}</span>`:"";
+      const blk=p.blockers?.length?`<span class="pill" style="background:rgba(217,142,63,.13);color:rgba(217,142,63,.85)" title="Status atual registrado">📌 ${p.blockers.length}</span>`:"";
       const rdm=p.rmdDate?`<span class="pill" style="background:rgba(139,92,246,.12);color:rgba(139,92,246,.75)">🗓 ${p.rmdDate}</span>`:"";
       const hasCR=!!(p.cardReminder);
       const dias=daysInStage(p);
@@ -5133,9 +5133,9 @@ function renderInfo(){
   let h=`<span class="slbl">Progresso automático</span>`;
   h+=`<div class="prog-auto-bar"><div class="prog-auto-fill" style="width:${pct}%"></div></div>`;
   h+=`<div class="prog-breakdown"><span>📍 Esteira: ${stageBase}%</span><span>✅ Checklist: +${checkContrib}%</span><span style="color:#D98E3F;font-weight:700">Total: ${pct}%</span></div>`;
-  h+=`<span class="slbl">Bloqueadores</span>`;
-  h+=p.blockers?.length?p.blockers.map(b=>`<div class="blk-item">🔴 ${b}</div>`).join(""):`<div style="font-size:11px;color:#55566A;margin-bottom:8px">Nenhum bloqueador registrado</div>`;
-  h+=`<button class="btn-s" onclick="editBlk()" style="margin-bottom:16px">Editar bloqueadores</button>`;
+  h+=`<span class="slbl">Status Atual</span>`;
+  h+=p.blockers?.length?p.blockers.map(b=>`<div class="blk-item">📌 ${b}</div>`).join(""):`<div style="font-size:11px;color:#55566A;margin-bottom:8px">Nenhuma atualização de status registrada</div>`;
+  h+=`<button class="btn-s" onclick="editBlk()" style="margin-bottom:16px">Editar status atual</button>`;
   h+=`<span class="slbl">Notas / Contexto</span><div class="nbox" onclick="editNotes()">${p.notes||"Sem notas — clique para editar"}</div>`;
   h+=`<span class="slbl" style="display:block;margin:16px 0 6px">Descrição da Demanda</span>`;
   h+=`<div class="nbox" onclick="editDesc()" style="min-height:60px">${(p.desc||"").replace(/\n/g,"<br>")||"<span style='color:#2C2D3C'>Sem descrição — clique para adicionar</span>"}</div>`;
@@ -5203,7 +5203,7 @@ function renderInfo(){
 }
 function editBlk(){
   const p=getP(selId);
-  document.getElementById("tInfo").innerHTML=`<span class="slbl" style="display:block;margin-bottom:4px">Bloqueadores (um por linha)</span>${richToolbar("bedit")}<textarea class="ea rt-area" rows="5" id="bedit">${p.blockers?.join("\n")||""}</textarea><div class="save-row" style="margin-top:6px"><button class="btn-s" onclick="saveBlk()">✓ Salvar</button><button class="btn-c" onclick="renderInfo()">✕ Cancelar</button></div>`;
+  document.getElementById("tInfo").innerHTML=`<span class="slbl" style="display:block;margin-bottom:4px">Status Atual (um por linha)</span>${richToolbar("bedit")}<textarea class="ea rt-area" rows="5" id="bedit">${p.blockers?.join("\n")||""}</textarea><div class="save-row" style="margin-top:6px"><button class="btn-s" onclick="saveBlk()">✓ Salvar</button><button class="btn-c" onclick="renderInfo()">✕ Cancelar</button></div>`;
   document.getElementById("bedit").focus();
 }
 function saveBlk(){const v=document.getElementById("bedit").value;setP(selId,{blockers:v.split("\n").filter(b=>b.trim())});renderInfo();renderBoard();renderStats();}
@@ -5611,7 +5611,7 @@ function renderReports(){
     <div class="rpt-card"><div class="rpt-num" style="color:#7A9B6B">${concluidos}</div><div class="rpt-lbl">✅ Concluídas</div></div>
     <div class="rpt-card"><div class="rpt-num" style="color:#f87171">${byPrio.urgent}</div><div class="rpt-lbl">🔴 Urgentes</div></div>
     <div class="rpt-card"><div class="rpt-num" style="color:#fb923c">${byPrio.high}</div><div class="rpt-lbl">🟠 Alta</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#fbbf24">${active.filter(p=>p.blockers?.length>0).length}</div><div class="rpt-lbl">🚧 Bloqueadas</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#fbbf24">${active.filter(p=>p.blockers?.length>0).length}</div><div class="rpt-lbl">📌 Com Status Atual</div></div>
     <div class="rpt-card"><div class="rpt-num" style="color:#8b5cf6">${active.filter(p=>p.stage==="rdm").length}</div><div class="rpt-lbl">🚀 Em RDM</div></div>
   </div>`;
 
@@ -5634,18 +5634,19 @@ function renderReports(){
   h+=`<div class="rpt-section-title">📈 Andamento por Demanda
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('andamento')">⬇ PDF</button>
   </div>
-  <table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Bloqueadores</th></tr></thead><tbody>`;
+  <table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Status Atual</th></tr></thead><tbody>`;
   byStage(active).forEach(p=>{
     const st=STAGES.find(s=>s.id===p.stage);
     const prioK=p.priority;
     const prioHtml=prioK&&prioK!=="normal"?`<span class="prio-badge ${prioK}">${PRIO[prioK]?.label}</span>`:`<span style="font-size:10px;color:#2C2D3C">—</span>`;
     const done=p.progress>=100;
+    const statusTxt=p.blockers?.length?p.blockers.join(" · "):"—";
     h+=`<tr style="cursor:pointer${done?";opacity:.65":""}" onclick="closeReportsPanel();openModal('${p.id}')">
       <td><strong>${p.name}</strong><br><span style="font-size:9px;color:#55566A;font-family:monospace">${p.code}</span></td>
       <td style="font-size:10px;white-space:nowrap">${st?.icon||""} <span style="color:${st?.color||"#A5A7B8"}">${st?.label||""}</span></td>
       <td>${prioHtml}</td>
       <td style="min-width:110px"><div class="pbar-sm"><div class="pbar-sm-f" style="width:${p.progress}%"></div></div> <span style="font-size:10px;color:${done?"#7A9B6B":"#D98E3F"};margin-left:4px;font-weight:600">${p.progress}%${done?" ✅":""}</span></td>
-      <td style="font-size:10px;color:${p.blockers?.length?"rgba(239,68,68,.8)":"#2C2D3C"}">${p.blockers?.length?`🚧 ${p.blockers.length}`:"-"}</td>
+      <td style="font-size:10px;color:${p.blockers?.length?"#D6D7E0":"#2C2D3C"};max-width:220px">${statusTxt}</td>
     </tr>`;
   });
   h+=`</tbody></table>`;
@@ -5735,22 +5736,22 @@ function exportPDF(type){
       <div class="s-card green"><div class="s-num">${concl}</div><div class="s-lbl">✅ Concluídas</div></div>
       <div class="s-card red"><div class="s-num">${byPrio.urgent}</div><div class="s-lbl">Urgentes</div></div>
       <div class="s-card orange"><div class="s-num">${byPrio.high}</div><div class="s-lbl">Prioridade Alta</div></div>
-      <div class="s-card yellow"><div class="s-num">${blk}</div><div class="s-lbl">Bloqueadas</div></div>
+      <div class="s-card yellow"><div class="s-num">${blk}</div><div class="s-lbl">Com Status Atual</div></div>
       <div class="s-card purple"><div class="s-num">${active.filter(p=>p.stage==="rdm").length}</div><div class="s-lbl">Em RDM</div></div>
     </div>
-    <table><thead><tr><th>Demanda</th><th>Código</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Bloqueadores</th></tr></thead><tbody>
+    <table><thead><tr><th>Demanda</th><th>Código</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Status Atual</th></tr></thead><tbody>
     ${byStage(active).map(p=>{const st=STAGES.find(s=>s.id===p.stage);return`<tr class="${p.progress>=100?"done":""}"><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${st?.label||""}</td><td>${PRIO[p.priority]?.label||""}</td><td><div class="bar"><div class="bar-fill" style="width:${p.progress}%"></div></div> ${p.progress}%</td><td class="${p.blockers?.length?"blk":""}">${p.blockers?.length?p.blockers.join("; "):"—"}</td></tr>`;}).join("")}
     </tbody></table>`;
   } else if(type==="stage"){
     content=STAGES.map(s=>{
       const ps=active.filter(p=>p.stage===s.id);if(!ps.length)return"";
       return `<div class="stage-block"><h3 style="color:${s.color};border-color:${s.color}40">${s.icon} ${s.label} (${ps.length})</h3>
-        <table><thead><tr><th>Demanda</th><th>Código</th><th>Prioridade</th><th>Progresso</th><th>Bloqueador</th></tr></thead><tbody>
+        <table><thead><tr><th>Demanda</th><th>Código</th><th>Prioridade</th><th>Progresso</th><th>Status Atual</th></tr></thead><tbody>
         ${ps.map(p=>`<tr><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${PRIO[p.priority]?.label||""}</td><td>${p.progress}%</td><td class="${p.blockers?.length?"blk":""}">${p.blockers?.[0]||"—"}</td></tr>`).join("")}
         </tbody></table></div>`;
     }).join("");
   } else if(type==="andamento"){
-    content=`<table><thead><tr><th>Demanda</th><th>Código</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Owner</th><th>Bloqueadores</th></tr></thead><tbody>
+    content=`<table><thead><tr><th>Demanda</th><th>Código</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Owner</th><th>Status Atual</th></tr></thead><tbody>
     ${byStage(active).map(p=>{const st=STAGES.find(s=>s.id===p.stage);return`<tr class="${p.progress>=100?"done":""}"><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${st?.label||""}</td><td>${PRIO[p.priority]?.label||""}</td><td><div class="bar"><div class="bar-fill" style="width:${p.progress}%"></div></div> ${p.progress}%</td><td>${p.owner||"—"}</td><td class="${p.blockers?.length?"blk":""}">${p.blockers?.length?p.blockers.join("; "):"—"}</td></tr>`;}).join("")}
     </tbody></table>`;
   } else if(type==="checklist"){
@@ -5825,7 +5826,7 @@ body.light .tab{color:#8B8D9B}
 body.light .tab.active{color:#B5701F}
 body.light .ea,.light .jira-inp,.light .link-inp,.light .add-task-inp{background:#fff;border-color:rgba(0,0,0,.2);color:#1C1D28}
 body.light .nbox{background:#fff;border-color:rgba(0,0,0,.12);color:#2C2D3C}
-body.light .blk-item{background:rgba(239,68,68,.08);color:#dc2626}
+body.light .blk-item{background:rgba(217,142,63,.08);color:#8A5A1E}
 body.light .side-panel{background:#F5F3EE;border-color:rgba(0,0,0,.12)}
 body.light .panel-hd{background:linear-gradient(90deg,#2A2117,#4A3B22)}
 body.light .sys-item{background:#fff;border-color:rgba(0,0,0,.1)}
@@ -6213,7 +6214,7 @@ function renderAI(){
   if(!apiKey){
     h+=`<div class="ai-nokey">⚠️ Assistente IA não configurado.<br>Clique em <strong>⚙ API Key</strong> no canto superior direito para configurar sua chave Anthropic.<br><button onclick="openSettings()">Configurar agora</button></div>`;
   }
-  const QS=["Próximos passos urgentes?","Gere texto para task de RDM no Jira","E-mail de aviso build em TH","Resumo de status para o Gabriel","Como desbloquear o principal bloqueador?"];
+  const QS=["Próximos passos urgentes?","Gere texto para task de RDM no Jira","E-mail de aviso build em TH","Resumo de status para o Gabriel","Como resolver o status atual pendente?"];
   h+=`<div class="ai-qs">${QS.map(q=>`<button class="ai-q" onclick="fillQ('${q.replace(/'/g,"\\'")}')">  ${q}</button>`).join("")}</div>`;
   h+=`<div class="msgs" id="msgs">${aiMsgs.map(m=>`<div class="msg ${m.r==="u"?"me":"ai"}"><div class="msg-who">${m.r==="u"?"Você":"✦ Claude"}</div>${m.t}</div>`).join("")}</div>`;
   if(aiLoading)h+=`<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span style="font-size:11px;color:#55566A">Claude pensando…</span></div>`;
