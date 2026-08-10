@@ -2122,23 +2122,34 @@ setInterval(async()=>{
 /* ── AUTH & USERS ────────────────────────────────────── */
 let currentUser = null;
 
-async function sbGetUser(email){
+// SEGURANÇA: login/registro passam por funções RPC no Postgres (SECURITY DEFINER).
+// O hash de senha nunca é lido/exposto pela API pública — a verificação acontece no banco.
+// Ver migração SQL: supabase/auth_rpc.sql
+async function sbEmailExists(email){
   try{
-    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id,email,name,role,last_login`);
-    const d=await r.json();return d?.[0]||null;
+    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id`);
+    const d=await r.json();return Array.isArray(d)&&d.length>0;
+  }catch(e){return false;}
+}
+async function sbLoginRpc(email,pwHash){
+  try{
+    const r=await sbFetch('rpc/login_user',{method:'POST',
+      body:JSON.stringify({p_email:email,p_hash:pwHash})});
+    if(!r.ok)return null;
+    const d=await r.json();return Array.isArray(d)?(d[0]||null):(d||null);
   }catch(e){return null;}
 }
-async function sbCreateUser(email,name,pwHash){
+async function sbRegisterRpc(email,name,pwHash){
   try{
-    const r=await sbFetch('app_users',{method:'POST',
-      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
-      body:JSON.stringify({email,name,password_hash:pwHash,role:'user'})});
-    const d=await r.json();return Array.isArray(d)?d[0]:d;
-  }catch(e){return null;}
+    const r=await sbFetch('rpc/register_user',{method:'POST',
+      body:JSON.stringify({p_email:email,p_name:name,p_hash:pwHash})});
+    if(!r.ok)return {error:'EMAIL_EXISTS'};
+    const d=await r.json();return {user:Array.isArray(d)?(d[0]||null):(d||null)};
+  }catch(e){return {error:'UNKNOWN'};}
 }
 async function sbUpdateLastLogin(id){
-  try{await sbFetch(`app_users?id=eq.${id}`,{method:'PATCH',
-    body:JSON.stringify({last_login:new Date().toISOString()})});}catch(e){}
+  try{await sbFetch('rpc/update_last_login',{method:'POST',
+    body:JSON.stringify({p_id:id})});}catch(e){}
 }
 
 // Simple hash (SHA-256 via SubtleCrypto)
@@ -2164,10 +2175,9 @@ async function doLogin(){
   const errEl=document.getElementById('loginErr');
   if(!email||!pass){errEl.textContent='Preencha e-mail e senha.';return;}
   errEl.textContent='Verificando…';
-  const user=await sbGetUser(email);
-  if(!user){errEl.textContent='E-mail não encontrado.';return;}
   const hash=await hashPw(pass);
-  if(hash!==user.password_hash){errEl.textContent='Senha incorreta.';return;}
+  const user=await sbLoginRpc(email,hash);
+  if(!user){errEl.textContent='E-mail ou senha incorretos.';return;}
   currentUser=user;
   lsSet('session',{id:user.id,email:user.email,name:user.name,role:user.role});
   sbUpdateLastLogin(user.id);
@@ -2182,11 +2192,11 @@ async function doRegister(){
   if(!name||!email||!pass){errEl.textContent='Preencha todos os campos.';return;}
   if(pass.length<6){errEl.textContent='Senha deve ter ao menos 6 caracteres.';return;}
   errEl.textContent='Criando conta…';
-  const existing=await sbGetUser(email);
-  if(existing){errEl.textContent='E-mail já cadastrado.';return;}
   const hash=await hashPw(pass);
-  const user=await sbCreateUser(email,name,hash);
-  if(!user){errEl.textContent='Erro ao criar conta. Tente novamente.';return;}
+  const result=await sbRegisterRpc(email,name,hash);
+  if(result.error==='EMAIL_EXISTS'){errEl.textContent='E-mail já cadastrado.';return;}
+  if(!result.user){errEl.textContent='Erro ao criar conta. Tente novamente.';return;}
+  const user=result.user;
   currentUser={...user,name,email,role:'user'};
   lsSet('session',{id:user.id||'new',email,name,role:'user'});
   logActivity('Conta criada','Novo usuário registrado');
