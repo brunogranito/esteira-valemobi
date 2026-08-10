@@ -58,6 +58,31 @@ body.light .et-line{background:#DCD9CE}
 body.light .et-caption{color:#7A776B}
 body.light .et-caption strong{color:#3A3730}
 body.light .et-dot{border-color:#F5F3EE}
+/* ── VIEW TOGGLE + TABELA ────────────────────────────── */
+.view-toggle{display:flex;gap:4px;margin-bottom:10px}
+.vt-btn{background:#1C1D28;border:1px solid #2C2D3C;color:#8B8D9B;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer}
+.vt-btn.active{background:rgba(217,142,63,.15);border-color:rgba(217,142,63,.4);color:#E2A968}
+body.light .vt-btn{background:#fff;border-color:#DCD9CE;color:#7A776B}
+body.light .vt-btn.active{background:#FAEEDA;border-color:#EF9F27;color:#854F0B}
+.tbl-wrap{overflow-x:auto;border:1px solid #2C2D3C;border-radius:10px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:920px}
+.tbl th{text-align:left;background:#1C1D28;color:#8B8D9B;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:9px 12px;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
+.tbl th:hover{color:#D6D7E0}
+.tbl th .sort-arrow{opacity:.5;margin-left:3px;font-size:9px}
+.tbl td{padding:9px 12px;border-top:1px solid #2C2D3C;color:#D6D7E0;vertical-align:middle}
+.tbl tr.tbl-row{cursor:pointer}
+.tbl tr.tbl-row:hover td{background:rgba(217,142,63,.06)}
+.tbl .tbl-name{font-weight:600;color:#EDEDF0}
+.tbl .tbl-code{color:#8B8D9B;font-size:10px}
+.tbl-stage-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap}
+.tbl-prio{font-size:11px;white-space:nowrap}
+.tbl-days{font-size:11px;color:#A5A7B8}
+.tbl-days.warn{color:#EF9F27;font-weight:600}
+.tbl-days.danger{color:#F09595;font-weight:600}
+body.light .tbl-wrap{border-color:#DCD9CE}
+body.light .tbl th{background:#EDEBE3;color:#7A776B}
+body.light .tbl td{color:#3A3730;border-top-color:#DCD9CE}
+body.light .tbl tr.tbl-row:hover td{background:#FAEEDA}
 .col{min-width:196px;flex:0 0 196px;background:rgba(28,29,40,.5);border:1px solid rgba(85,86,106,.25);border-radius:12px;padding:12px}
 .col-hd{display:flex;align-items:center;gap:7px;margin-bottom:11px;padding-bottom:9px}
 .col-hd-inner{display:flex;align-items:center;gap:7px;flex:1;padding-bottom:9px;border-bottom:2px solid var(--cc,#888)}
@@ -759,7 +784,12 @@ body.light .paci-name{color:#1C1D28}
     </div>
   </div>
   <div class="esteira-track" id="esteiraTrack"></div>
+  <div class="view-toggle">
+    <button class="vt-btn active" id="vtKanban" onclick="setBoardView('kanban')" title="Visão Kanban">▦ Kanban</button>
+    <button class="vt-btn" id="vtTable" onclick="setBoardView('table')" title="Visão em Tabela">☰ Tabela</button>
+  </div>
   <div class="kb" id="board"></div>
+  <div id="tableView" style="display:none"></div>
 </div>
 
 <!-- PROJECT MODAL -->
@@ -4349,6 +4379,76 @@ function addToOrder(sid,id,beforeId=null){
 }
 
 /* ── BOARD ──────────────────────────────────────────── */
+/* ── VIEW TOGGLE (Kanban / Tabela) ───────────────────── */
+let boardView=lsGet('boardView')||'kanban';
+let tblSort={col:'stage',dir:1};
+
+function setBoardView(v){
+  boardView=v;lsSet('boardView',v);
+  document.getElementById('vtKanban').classList.toggle('active',v==='kanban');
+  document.getElementById('vtTable').classList.toggle('active',v==='table');
+  document.getElementById('board').style.display=v==='kanban'?'':'none';
+  document.getElementById('tableView').style.display=v==='table'?'':'none';
+  if(v==='table')renderTableView();
+}
+
+function sortTable(col){
+  if(tblSort.col===col){tblSort.dir*=-1;}else{tblSort.col=col;tblSort.dir=1;}
+  renderTableView();
+}
+
+function renderTableView(){
+  const wrap=document.getElementById('tableView');if(!wrap)return;
+  const stageIdx=Object.fromEntries(STAGES.map((s,i)=>[s.id,i]));
+  const prioOrder={urgent:0,high:1,normal:2,low:3};
+  let rows=projects.filter(p=>!p.archived);
+
+  const sorters={
+    name:(p)=>(p.name||'').toLowerCase(),
+    stage:(p)=>stageIdx[p.stage]??99,
+    priority:(p)=>prioOrder[p.priority]??9,
+    owner:(p)=>(p.owner||'').toLowerCase(),
+    dev:(p)=>(p.dev||'').toLowerCase(),
+    days:(p)=>daysInStage(p)??-1,
+    rmd:(p)=>p.rmdDate?parseDate(p.rmdDate)?.getTime()||0:0,
+    progress:(p)=>p.progress||0,
+  };
+  const sf=sorters[tblSort.col]||sorters.stage;
+  rows=[...rows].sort((a,b)=>{
+    const av=sf(a),bv=sf(b);
+    if(av<bv)return -1*tblSort.dir;if(av>bv)return 1*tblSort.dir;return 0;
+  });
+
+  const arrow=(col)=>tblSort.col===col?`<span class="sort-arrow">${tblSort.dir===1?"▲":"▼"}</span>`:"";
+  const cols=[
+    ["name","Demanda"],["stage","Estágio"],["priority","Prioridade"],
+    ["owner","Owner"],["dev","Dev"],["days","Dias no estágio"],["rmd","RDM"],["progress","Progresso"]
+  ];
+
+  wrap.innerHTML=`
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr>${cols.map(([k,l])=>`<th onclick="sortTable('${k}')">${l}${arrow(k)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows.map(p=>{
+          const s=STAGES.find(x=>x.id===p.stage)||{};
+          const pr=PRIO[p.priority]||PRIO.normal;
+          const days=daysInStage(p);
+          const daysCls=days==null?"":days>10?"danger":days>5?"warn":"";
+          return `<tr class="tbl-row" onclick="setBoardView('kanban');openModal('${p.id}')">
+            <td><div class="tbl-name">${p.name||"(sem nome)"}</div><div class="tbl-code">${p.code||""}</div></td>
+            <td><span class="tbl-stage-pill" style="background:${s.color}20;color:${s.color}">${s.icon||""} ${s.label||p.stage}</span></td>
+            <td class="tbl-prio">${pr.icon} ${pr.label}</td>
+            <td>${p.owner||"—"}</td>
+            <td>${p.dev||"—"}</td>
+            <td class="tbl-days ${daysCls}">${days==null?"—":days+"d"}</td>
+            <td>${p.rmdDate||"—"}</td>
+            <td>${p.progress||0}%</td>
+          </tr>`;
+        }).join("")||`<tr><td colspan="8" style="text-align:center;color:#8B8D9B;padding:24px">Nenhuma demanda ativa</td></tr>`}
+      </tbody>
+    </table></div>`;
+}
+
 function renderEsteiraTrack(){
   const track=document.getElementById('esteiraTrack');if(!track)return;
   const activeProjects=projects.filter(p=>!p.archived);
@@ -4382,6 +4482,7 @@ function renderEsteiraTrack(){
 
 function renderBoard(){
   renderEsteiraTrack();
+  if(boardView==='table')renderTableView();
   const board=document.getElementById("board");board.innerHTML="";
   STAGES.forEach(s=>{
     const col=document.createElement("div");col.className="col";
@@ -5825,6 +5926,7 @@ async function initApp(){
   });
   renderBoard();
   renderStats();
+  if(boardView==='table')setBoardView('table');
   requestNotifPerm();
   checkReminders();
   setInterval(checkReminders,60000);
