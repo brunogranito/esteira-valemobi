@@ -45,19 +45,6 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 
 /* ── KANBAN ─────────────────────────────────────────── */
 .kb{display:flex;gap:12px;overflow-x:auto;padding:4px 0 16px;align-items:flex-start}
-/* ── ESTEIRA TRACK (elemento de assinatura) ─────────── */
-.esteira-track{padding:2px 2px 14px}
-.et-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
-.et-caption{font-size:10px;color:#8B8D9B;letter-spacing:.3px}
-.et-caption strong{color:#D6D7E0;font-weight:600}
-.et-line{position:relative;height:4px;background:#232435;border-radius:2px}
-.et-seg{position:absolute;top:0;height:100%;transition:background .3s}
-.et-dot{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #14151F;transition:all .3s;cursor:default}
-.et-dot.filled{box-shadow:0 0 0 2px rgba(217,142,63,.15)}
-body.light .et-line{background:#DCD9CE}
-body.light .et-caption{color:#7A776B}
-body.light .et-caption strong{color:#3A3730}
-body.light .et-dot{border-color:#F5F3EE}
 /* ── VIEW TOGGLE + TABELA ────────────────────────────── */
 .view-toggle{display:flex;align-items:center;gap:4px;margin-bottom:10px}
 .vt-btn{background:#1C1D28;border:1px solid #2C2D3C;color:#8B8D9B;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer}
@@ -92,10 +79,6 @@ body.tv-mode .view-toggle{display:none!important}
 body.tv-mode .app-hd{justify-content:center;padding:18px 0 6px}
 body.tv-mode .app-title{font-size:30px}
 body.tv-mode .app-sub{font-size:13px}
-body.tv-mode .esteira-track{padding:6px 20px 20px;max-width:1400px;margin:0 auto}
-body.tv-mode .et-caption{font-size:13px}
-body.tv-mode .et-line{height:6px}
-body.tv-mode .et-dot{width:14px!important;height:14px!important}
 body.tv-mode .kb{padding:0 20px 20px;justify-content:center}
 body.tv-mode .col{min-width:220px}
 body.tv-mode .col-title{font-size:13px}
@@ -809,7 +792,6 @@ body.light .paci-name{color:#1C1D28}
       <div id="archList"></div>
     </div>
   </div>
-  <div class="esteira-track" id="esteiraTrack"></div>
   <div class="view-toggle">
     <button class="vt-btn active" id="vtKanban" onclick="setBoardView('kanban')" title="Visão Kanban">▦ Kanban</button>
     <button class="vt-btn" id="vtTable" onclick="setBoardView('table')" title="Visão em Tabela">☰ Tabela</button>
@@ -4818,39 +4800,7 @@ function confirmCsvImport(){
   showToast("✅ Importação concluída",`${created} criada(s), ${updated} atualizada(s)`);
 }
 
-function renderEsteiraTrack(){
-  const track=document.getElementById('esteiraTrack');if(!track)return;
-  const activeProjects=projects.filter(p=>!p.archived);
-  const total=activeProjects.length;
-  const n=STAGES.length;
-  const counts=STAGES.map(s=>activeProjects.filter(p=>p.stage===s.id).length);
-  const activeStages=counts.filter(c=>c>0).length;
-
-  let dotsHtml="",segsHtml="";
-  STAGES.forEach((s,i)=>{
-    const pct=n>1?(i/(n-1))*100:0;
-    const count=counts[i];
-    const filled=count>0;
-    const size=filled?Math.min(15,9+Math.round(Math.sqrt(count))*2):8;
-    const color=filled?s.color:"#3A3B4E";
-    dotsHtml+=`<div class="et-dot${filled?" filled":""}" title="${s.label}: ${count}" style="left:${pct}%;width:${size}px;height:${size}px;background:${color}"></div>`;
-  });
-  const activeIdxs=counts.map((c,i)=>c>0?i:-1).filter(i=>i>=0);
-  if(activeIdxs.length){
-    const first=activeIdxs[0],last=activeIdxs[activeIdxs.length-1];
-    const leftPct=n>1?(first/(n-1))*100:0;
-    const rightPct=n>1?(last/(n-1))*100:0;
-    segsHtml=`<div class="et-seg" style="left:${leftPct}%;width:${rightPct-leftPct}%;background:linear-gradient(90deg,#D98E3F,#B5701F)"></div>`;
-  }
-  track.innerHTML=`
-    <div class="et-top">
-      <div class="et-caption">esteira de produção · <strong>${total}</strong> demanda${total!==1?"s":""} ativa${total!==1?"s":""} em <strong>${activeStages}</strong> de ${n} estações</div>
-    </div>
-    <div class="et-line">${segsHtml}${dotsHtml}</div>`;
-}
-
 function renderBoard(){
-  renderEsteiraTrack();
   if(boardView==='table')renderTableView();
   const board=document.getElementById("board");board.innerHTML="";
   STAGES.forEach(s=>{
