@@ -53,7 +53,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if exists (select 1 from app_users where email = lower(p_email)) then
+  if exists (select 1 from app_users u where u.email = lower(p_email)) then
     raise exception 'EMAIL_EXISTS';
   end if;
 
