@@ -5056,7 +5056,6 @@ function openModal(id){
   document.getElementById("modalBg").classList.add("open");
   renderModal();
 }
-document.getElementById("modalBg").addEventListener("click",e=>{if(e.target===document.getElementById("modalBg"))closeModal();});
 function closeModal(){document.getElementById("modalBg").classList.remove("open");selId=null;}
 
 function renderModal(){
