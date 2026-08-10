@@ -83,6 +83,29 @@ body.light .tbl-wrap{border-color:#DCD9CE}
 body.light .tbl th{background:#EDEBE3;color:#7A776B}
 body.light .tbl td{color:#3A3730;border-top-color:#DCD9CE}
 body.light .tbl tr.tbl-row:hover td{background:#FAEEDA}
+/* ── MODO TV / APRESENTAÇÃO ──────────────────────────── */
+body.tv-mode{background:#0A0A10}
+body.tv-mode .sidebar-toggle,
+body.tv-mode .bulk-bar,
+body.tv-mode .hd-right,
+body.tv-mode .view-toggle{display:none!important}
+body.tv-mode .app-hd{justify-content:center;padding:18px 0 6px}
+body.tv-mode .app-title{font-size:30px}
+body.tv-mode .app-sub{font-size:13px}
+body.tv-mode .esteira-track{padding:6px 20px 20px;max-width:1400px;margin:0 auto}
+body.tv-mode .et-caption{font-size:13px}
+body.tv-mode .et-line{height:6px}
+body.tv-mode .et-dot{width:14px!important;height:14px!important}
+body.tv-mode .kb{padding:0 20px 20px;justify-content:center}
+body.tv-mode .col{min-width:220px}
+body.tv-mode .col-title{font-size:13px}
+body.tv-mode .card-name{font-size:13px}
+body.tv-mode .card{pointer-events:none;cursor:default}
+body.tv-mode .col-count{font-size:11px}
+.tv-exit-btn{position:fixed;top:14px;right:14px;z-index:5000;background:rgba(20,21,31,.85);border:1px solid rgba(85,86,106,.4);color:#D6D7E0;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:none}
+body.tv-mode .tv-exit-btn{display:block}
+.tv-clock{position:fixed;top:16px;left:16px;z-index:5000;color:#8B8D9B;font-size:13px;font-weight:600;display:none;font-family:'Space Grotesk',sans-serif}
+body.tv-mode .tv-clock{display:block}
 .col{min-width:196px;flex:0 0 196px;background:rgba(28,29,40,.5);border:1px solid rgba(85,86,106,.25);border-radius:12px;padding:12px}
 .col-hd{display:flex;align-items:center;gap:7px;margin-bottom:11px;padding-bottom:9px}
 .col-hd-inner{display:flex;align-items:center;gap:7px;flex:1;padding-bottom:9px;border-bottom:2px solid var(--cc,#888)}
@@ -708,6 +731,8 @@ body.light .paci-name{color:#1C1D28}
   </div>
 </div>
 
+<button class="tv-exit-btn" onclick="exitTvMode()">✕ Sair do Modo TV</button>
+<div class="tv-clock" id="tvClock"></div>
 <!-- LEFT SIDEBAR -->
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div id="leftSidebar">
@@ -791,6 +816,7 @@ body.light .paci-name{color:#1C1D28}
     <span style="flex:1"></span>
     <button class="vt-btn" onclick="exportCSV()" title="Exportar todas as demandas para CSV">⬇ Exportar CSV</button>
     <button class="vt-btn" onclick="document.getElementById('csvFileInput').click()" title="Importar demandas de um arquivo CSV">⬆ Importar CSV</button>
+    <button class="vt-btn" onclick="enterTvMode()" title="Modo apresentação (somente leitura, tela cheia)">🖥 Modo TV</button>
     <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCsvFile(this.files[0])">
   </div>
   <div class="kb" id="board"></div>
@@ -4635,6 +4661,35 @@ function renderTableView(){
       </tbody>
     </table></div>`;
 }
+
+/* ── MODO TV / APRESENTAÇÃO ──────────────────────────── */
+let tvMode=false;
+let tvClockInterval=null;
+
+function enterTvMode(){
+  tvMode=true;
+  clearSelection();
+  document.body.classList.add('tv-mode');
+  const el=document.documentElement;
+  if(el.requestFullscreen)el.requestFullscreen().catch(()=>{});
+  updateTvClock();
+  tvClockInterval=setInterval(updateTvClock,1000);
+}
+function exitTvMode(){
+  tvMode=false;
+  document.body.classList.remove('tv-mode');
+  if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+  if(tvClockInterval){clearInterval(tvClockInterval);tvClockInterval=null;}
+}
+function updateTvClock(){
+  const el=document.getElementById('tvClock');if(!el)return;
+  const now=new Date();
+  el.textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'})+' · '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+// Sair do modo TV automaticamente se o usuário apertar Esc (sai do fullscreen nativo)
+document.addEventListener('fullscreenchange',()=>{
+  if(!document.fullscreenElement&&tvMode)exitTvMode();
+});
 
 /* ── EXPORT / IMPORT CSV ──────────────────────────────── */
 function exportCSV(){
