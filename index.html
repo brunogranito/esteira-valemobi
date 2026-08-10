@@ -814,6 +814,7 @@ body.light .paci-name{color:#1C1D28}
     </div>
     <div class="tabs">
       <button class="tab active" onclick="sw('info')">Informações</button>
+      <button class="tab" onclick="sw('cmt')">💬 Comentários</button>
       <button class="tab" onclick="sw('check')">✓ Checklist</button>
       <button class="tab" onclick="sw('ia')">✦ IA</button>
       <button class="tab" onclick="sw('jira')">🔗 Jira</button>
@@ -822,6 +823,7 @@ body.light .paci-name{color:#1C1D28}
     </div>
     <div class="mbody">
       <div id="tInfo"></div>
+      <div id="tCmt" style="display:none"></div>
       <div id="tCheck" style="display:none"></div>
       <div id="tIa" style="display:none"></div>
       <div id="tJira" style="display:none"></div>
@@ -2146,6 +2148,55 @@ function renderDeps(){
 function addDep(did){if(!did)return;const p=getP(selId);const deps=[...(p.deps||[]),did];setP(selId,{deps});renderDeps();}
 function removeDep(did){const p=getP(selId);setP(selId,{deps:(p.deps||[]).filter(d=>d!==did)});renderDeps();}
 
+/* ── COMENTÁRIOS ──────────────────────────────────────── */
+function highlightMentions(text){
+  const esc=(text||'').replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return esc.replace(/@(\w+)/g,'<span style="color:#E2A968;font-weight:600">@$1</span>');
+}
+function renderComments(){
+  const p=getP(selId);if(!p)return;
+  const comments=[...(p.comments||[])].sort((a,b)=>a.ts-b.ts);
+  const people=getPeople();
+  const namesDatalist=people.map(pe=>`<option value="@${pe.name.split(' ')[0]}">`).join('');
+  let h=`<div id="cmtList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:360px;overflow-y:auto">
+    ${comments.length?comments.map(c=>{
+      const isMine=currentUser&&c.author===currentUser.name;
+      const fmt=new Date(c.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return`<div style="background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.25);border-radius:8px;padding:9px 11px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <span style="font-size:11px;font-weight:600;color:#EDEDF0">${c.author||'—'}</span>
+          <span style="font-size:9px;color:#8B8D9B">${fmt}</span>
+        </div>
+        <div style="font-size:12px;color:#D6D7E0;white-space:pre-wrap;line-height:1.5">${highlightMentions(c.text)}</div>
+        ${isMine?`<button onclick="deleteComment('${c.id}')" style="margin-top:5px;background:none;border:none;color:#8B8D9B;font-size:10px;cursor:pointer;padding:0">🗑 Excluir</button>`:''}
+      </div>`;
+    }).join(''):'<div style="font-size:11px;color:#55566A;text-align:center;padding:16px 0">Nenhum comentário ainda.</div>'}
+  </div>
+  <datalist id="cmtMentionList">${namesDatalist}</datalist>
+  <textarea id="cmtInput" placeholder="Escreva um comentário… use @nome para mencionar alguém" style="width:100%;min-height:60px;background:rgba(20,21,31,.6);border:1px solid rgba(85,86,106,.35);color:#EDEDF0;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;resize:vertical"></textarea>
+  <div style="display:flex;justify-content:flex-end;margin-top:6px">
+    <button onclick="addComment()" style="background:rgba(217,142,63,.15);border:1px solid rgba(217,142,63,.4);color:#E2A968;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Comentar</button>
+  </div>`;
+  document.getElementById('tCmt').innerHTML=h;
+  const list=document.getElementById('cmtList');if(list)list.scrollTop=list.scrollHeight;
+}
+function addComment(){
+  const inp=document.getElementById('cmtInput');
+  const text=(inp?.value||'').trim();
+  if(!text)return;
+  const p=getP(selId);if(!p)return;
+  const comment={id:'c'+Date.now()+Math.random().toString(36).slice(2,6),author:currentUser?.name||'Anônimo',text,ts:Date.now()};
+  setP(selId,{comments:[...(p.comments||[]),comment]});
+  logActivity('Comentário adicionado',text.slice(0,60),selId,p.name);
+  renderComments();
+}
+function deleteComment(cid){
+  const p=getP(selId);if(!p)return;
+  if(!confirm('Excluir este comentário?'))return;
+  setP(selId,{comments:(p.comments||[]).filter(c=>c.id!==cid)});
+  renderComments();
+}
+
 // ── REAL-TIME POLLING (30s) ─────────────────────────
 let lastSbCheck=Date.now();
 setInterval(async()=>{
@@ -3114,7 +3165,32 @@ function checkReminders(){
     });
   });
 
-  updateBell(overdueCount);
+  updateBell(overdueCount+getPendingMentions().length);
+}
+
+/* ── MENÇÕES (@nome nos comentários) ─────────────────── */
+function isMentioned(text){
+  if(!currentUser||!text)return false;
+  const firstName=(currentUser.name||'').trim().split(' ')[0].toLowerCase();
+  if(!firstName)return false;
+  return new RegExp('@'+firstName,'i').test(text);
+}
+function getPendingMentions(){
+  if(!currentUser)return[];
+  const seenTs=lsGet('mentionsSeenTs_'+currentUser.id)||0;
+  const out=[];
+  projects.filter(p=>!p.archived).forEach(p=>{
+    (p.comments||[]).forEach(c=>{
+      if(c.ts>seenTs&&isMentioned(c.text)&&c.author!==currentUser.name){
+        out.push({pid:p.id,pname:p.name,author:c.author,text:c.text,ts:c.ts});
+      }
+    });
+  });
+  return out.sort((a,b)=>b.ts-a.ts);
+}
+function markMentionsSeen(){
+  if(!currentUser)return;
+  lsSet('mentionsSeenTs_'+currentUser.id,Date.now());
 }
 
 
@@ -3123,6 +3199,7 @@ function openNotifSidebar(){
   document.getElementById('notifSidebar').style.right='0';
   document.getElementById('notifSidebarOverlay').style.display='block';
   renderNotifSidebar();
+  markMentionsSeen();
   // Mark all as seen → clear bell count
   updateBell(0);
 }
@@ -3150,7 +3227,7 @@ function renderNotifSidebar(){
     });
   });
 
-  if(!items.length){
+  if(!items.length&&!getPendingMentions().length){
     body.innerHTML=`<div style="font-size:11px;color:#55566A;text-align:center;padding:28px 0">Nenhum lembrete cadastrado.</div>`;
     return;
   }
@@ -3180,7 +3257,22 @@ function renderNotifSidebar(){
     }).join('');
   }
 
-  body.innerHTML=renderGroup(future,'🔔 Próximos','#D98E3F')+renderGroup(past,'⚠ Vencidos','#f87171');
+  body.innerHTML=renderGroup(future,'🔔 Próximos','#D98E3F')+renderGroup(past,'⚠ Vencidos','#f87171')+renderMentionsGroup();
+}
+
+function renderMentionsGroup(){
+  const mentions=getPendingMentions();
+  if(!mentions.length)return'';
+  return`<div style="font-size:9px;font-weight:700;color:#8067B0;text-transform:uppercase;letter-spacing:.6px;margin:12px 0 6px">💬 Menções</div>`+
+    mentions.map(m=>{
+      const fmt=new Date(m.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return`<div class="notif-item" onclick="closeNotifSidebar();openModal('${m.pid}');sw('cmt')"
+        style="background:rgba(128,103,176,.08);border:1px solid rgba(128,103,176,.25);border-radius:8px;padding:10px 12px;margin-bottom:7px;cursor:pointer">
+        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px">${m.pname}</div>
+        <div style="font-size:10px;color:#8B8D9B;margin-bottom:4px">${m.author} mencionou você: "${(m.text||'').slice(0,80)}${m.text.length>80?'…':''}"</div>
+        <div style="font-size:9px;color:#8B8D9B">${fmt}</div>
+      </div>`;
+    }).join('');
 }
 
 function updateNotifDate(pid,tid,type,val){
@@ -4742,7 +4834,7 @@ function closeModal(){document.getElementById("modalBg").classList.remove("open"
 function renderModal(){
   const p=getP(selId);if(!p)return;
   // Fix 4: sempre resetar visual das abas para Informações ao abrir
-  const tabs=["info","check","ia","jira","mtg","dep"];
+  const tabs=["info","cmt","check","ia","jira","mtg","dep"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===curTab));
   const st=STAGES.find(s=>s.id===p.stage);
   document.getElementById("mCode").innerHTML=`<span onclick="startEditCode()" title="Clique para editar" style="cursor:text;border-bottom:1px dashed rgba(217,142,63,.4)">${p.code}</span>`;
@@ -4785,15 +4877,16 @@ function moveStage(sid){
 
 function sw(t){
   curTab=t;
-  const tabs=["info","check","ia","jira","mtg","dep"];
+  const tabs=["info","cmt","check","ia","jira","mtg","dep"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===t));
   renderTab();
 }
 function renderTab(){
-  ["tInfo","tCheck","tIa","tJira","tMtg","tDep"].forEach(id=>document.getElementById(id).style.display="none");
-  const map={info:"tInfo",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep"};
+  ["tInfo","tCmt","tCheck","tIa","tJira","tMtg","tDep"].forEach(id=>document.getElementById(id).style.display="none");
+  const map={info:"tInfo",cmt:"tCmt",check:"tCheck",ia:"tIa",jira:"tJira",mtg:"tMtg",dep:"tDep"};
   document.getElementById(map[curTab]||"tInfo").style.display="block";
   if(curTab==="info")renderInfo();
+  if(curTab==="cmt")renderComments();
   if(curTab==="check")renderCheck();
   if(curTab==="ia")renderAI();
   if(curTab==="jira")renderJiraModal();
