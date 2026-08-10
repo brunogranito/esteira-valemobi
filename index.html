@@ -3520,46 +3520,31 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   if(!dragTaskId||dragTaskId===toTid)return;
   const p=getP(selId);if(!p)return;
   const [sId,secS]=sectionKey.split('|||');
-  const fromCustomKey=dragTaskStage+'|||__custom__';
-  const isFromCustom=(_sectionTaskIds[fromCustomKey]||[]).includes(dragTaskId);
 
-  // Verifica se é tarefa injetada (foi arrastada de custom para default antes)
-  const isInjected=Object.values((p.injectedTasks||{})[sId]||{}).flat().some(t=>t.tid===dragTaskId);
-
-  // ── Caso 1: Custom → seção padrão (injetar) ──────────────
-  if(isFromCustom && secS!=='__custom__'){
-    // Busca a tarefa em qualquer stage de customTasks
-    let task=null;
-    const newCT=JSON.parse(JSON.stringify(p.customTasks||{}));
-    Object.keys(newCT).forEach(s=>{
-      const idx=(newCT[s]||[]).findIndex(t=>t.tid===dragTaskId);
-      if(idx>=0){task=newCT[s][idx];newCT[s].splice(idx,1);}
+  // Localiza a posição REAL da tarefa arrastada nos dados (nunca confia em cache de render,
+  // que fica desatualizado assim que a tarefa muda de lugar — causa da 1ª trava relatada)
+  const customArr=(p.customTasks||{})[dragTaskStage]||[];
+  const isFromCustom=customArr.some(t=>t.tid===dragTaskId);
+  let fromSection=null; // nome da seção padrão onde já está injetada, se for o caso
+  if(!isFromCustom){
+    const stageInj=(p.injectedTasks||{})[dragTaskStage]||{};
+    Object.keys(stageInj).forEach(sec=>{
+      if((stageInj[sec]||[]).some(t=>t.tid===dragTaskId))fromSection=sec;
     });
-    if(!task)return;
-    const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
-    if(!injected[sId])injected[sId]={};
-    const secList=[...(injected[sId][secS]||[])];
-    const toIds=_sectionTaskIds[sectionKey]||[];
-    const toIdx=toIds.indexOf(toTid);
-    secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:task.tx});
-    injected[sId][secS]=secList;
-    setP(selId,{customTasks:newCT,injectedTasks:injected});
-    renderCheck();return;
   }
+  const isFromInjected=fromSection!==null;
+  const isMovable=isFromCustom||isFromInjected; // só tarefas custom/injetadas podem mudar de seção
 
-  // ── Caso 2: Injetada ou qualquer → volta para custom ─────
+  // ── Voltar para a área "Tarefas adicionadas" (custom) ──────
   if(secS==='__custom__'){
-    if(isInjected){
-      // Remove de injectedTasks e volta para customTasks
+    if(isFromInjected){
       const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+      const arr=(injected[dragTaskStage]||{})[fromSection]||[];
+      const idx=arr.findIndex(t=>t.tid===dragTaskId);
       let taskTx='';
-      Object.keys(injected[sId]||{}).forEach(sec=>{
-        const idx=(injected[sId][sec]||[]).findIndex(t=>t.tid===dragTaskId);
-        if(idx>=0){taskTx=injected[sId][sec][idx].tx;injected[sId][sec].splice(idx,1);}
-      });
+      if(idx>=0){taskTx=arr[idx].tx;arr.splice(idx,1);}
       const stageCT=[...((p.customTasks||{})[sId]||[])];
       if(!stageCT.find(t=>t.tid===dragTaskId)){
-        // Insere na posição do toTid se possível
         const ctIds=(_sectionTaskIds[sectionKey]||[]);
         const toIdx=ctIds.indexOf(toTid);
         stageCT.splice(toIdx<0?stageCT.length:toIdx,0,{tid:dragTaskId,tx:taskTx});
@@ -3567,17 +3552,44 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
       setP(selId,{injectedTasks:injected,customTasks:{...(p.customTasks||{}),[sId]:stageCT}});
       renderCheck();return;
     }
-    // Reordenar customTasks normais
-    const ct=JSON.parse(JSON.stringify((p.customTasks||{})[sId]||[]));
-    const fi=ct.findIndex(t=>t.tid===dragTaskId);
-    const ti=ct.findIndex(t=>t.tid===toTid);
-    if(fi<0||ti<0)return;
-    ct.splice(ti,0,ct.splice(fi,1)[0]);
-    setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
+    if(isFromCustom){
+      const ct=JSON.parse(JSON.stringify((p.customTasks||{})[sId]||[]));
+      const fi=ct.findIndex(t=>t.tid===dragTaskId);
+      const ti=ct.findIndex(t=>t.tid===toTid);
+      if(fi<0||ti<0)return;
+      ct.splice(ti,0,ct.splice(fi,1)[0]);
+      setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
+      renderCheck();return;
+    }
+    return; // tarefa padrão/permanente não pode ir pra área custom
+  }
+
+  // ── Movendo PARA uma seção padrão: 1ª injeção (custom→padrão) OU
+  //    mudança de seção de uma tarefa já injetada (resolve a 2ª trava relatada) ──
+  if(isMovable && fromSection!==secS){
+    const newCT=JSON.parse(JSON.stringify(p.customTasks||{}));
+    const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+    let taskTx=null;
+    if(isFromCustom){
+      const idx=(newCT[dragTaskStage]||[]).findIndex(t=>t.tid===dragTaskId);
+      if(idx>=0){taskTx=newCT[dragTaskStage][idx].tx;newCT[dragTaskStage].splice(idx,1);}
+    } else if(isFromInjected){
+      const arr=(injected[dragTaskStage]||{})[fromSection]||[];
+      const idx=arr.findIndex(t=>t.tid===dragTaskId);
+      if(idx>=0){taskTx=arr[idx].tx;arr.splice(idx,1);}
+    }
+    if(taskTx===null)return;
+    if(!injected[sId])injected[sId]={};
+    const secList=[...(injected[sId][secS]||[])];
+    const toIds=_sectionTaskIds[sectionKey]||[];
+    const toIdx=toIds.indexOf(toTid);
+    secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:taskTx});
+    injected[sId][secS]=secList;
+    setP(selId,{customTasks:newCT,injectedTasks:injected});
     renderCheck();return;
   }
 
-  // ── Caso 3: Reordenar dentro de seção padrão (inclui injetadas) ──
+  // ── Reordenar dentro da MESMA seção (nativa, permanente, ou já injetada ali) ──
   const ids=_sectionTaskIds[sectionKey];
   if(!ids||!ids.length)return;
   const order=[...ids];
