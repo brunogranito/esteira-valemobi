@@ -59,7 +59,7 @@ body.light .et-caption{color:#7A776B}
 body.light .et-caption strong{color:#3A3730}
 body.light .et-dot{border-color:#F5F3EE}
 /* ── VIEW TOGGLE + TABELA ────────────────────────────── */
-.view-toggle{display:flex;gap:4px;margin-bottom:10px}
+.view-toggle{display:flex;align-items:center;gap:4px;margin-bottom:10px}
 .vt-btn{background:#1C1D28;border:1px solid #2C2D3C;color:#8B8D9B;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer}
 .vt-btn.active{background:rgba(217,142,63,.15);border-color:rgba(217,142,63,.4);color:#E2A968}
 body.light .vt-btn{background:#fff;border-color:#DCD9CE;color:#7A776B}
@@ -651,6 +651,7 @@ body.light .paci-name{color:#1C1D28}
 .tp-add-btn{background:rgba(217,142,63,.15);border:1px solid rgba(217,142,63,.3);color:#E2A968;padding:7px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;flex-shrink:0}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body>
 
@@ -787,6 +788,10 @@ body.light .paci-name{color:#1C1D28}
   <div class="view-toggle">
     <button class="vt-btn active" id="vtKanban" onclick="setBoardView('kanban')" title="Visão Kanban">▦ Kanban</button>
     <button class="vt-btn" id="vtTable" onclick="setBoardView('table')" title="Visão em Tabela">☰ Tabela</button>
+    <span style="flex:1"></span>
+    <button class="vt-btn" onclick="exportCSV()" title="Exportar todas as demandas para CSV">⬇ Exportar CSV</button>
+    <button class="vt-btn" onclick="document.getElementById('csvFileInput').click()" title="Importar demandas de um arquivo CSV">⬆ Importar CSV</button>
+    <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCsvFile(this.files[0])">
   </div>
   <div class="kb" id="board"></div>
   <div id="tableView" style="display:none"></div>
@@ -1028,6 +1033,17 @@ body.light .paci-name{color:#1C1D28}
     <div style="display:flex;gap:8px">
       <button onclick="confirmAddCard()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Criar card</button>
       <button onclick="closeAddCardModal()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.3);color:#8B8D9B;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
+  </div>
+</div>
+<div id="csvImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1C1D28;border:1px solid rgba(85,86,106,.3);border-radius:12px;padding:24px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.7)">
+    <div style="font-size:15px;font-weight:700;color:#EDEDF0;margin-bottom:6px">⬆ Importar CSV</div>
+    <div id="csvImportSummary" style="font-size:11px;color:#8B8D9B;margin-bottom:12px"></div>
+    <div id="csvImportList" style="flex:1;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:5px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmCsvImport()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Confirmar importação</button>
+      <button onclick="closeCsvImportModal()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.3);color:#8B8D9B;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
     </div>
   </div>
 </div>
@@ -4618,6 +4634,133 @@ function renderTableView(){
         }).join("")||`<tr><td colspan="8" style="text-align:center;color:#8B8D9B;padding:24px">Nenhuma demanda ativa</td></tr>`}
       </tbody>
     </table></div>`;
+}
+
+/* ── EXPORT / IMPORT CSV ──────────────────────────────── */
+function exportCSV(){
+  const rows=projects.map(p=>({
+    codigo:p.code||"",
+    nome:p.name||"",
+    estagio:p.stage||"",
+    prioridade:p.priority||"",
+    owner:p.owner||"",
+    dev:p.dev||"",
+    qa:p.qa||"",
+    rdm:p.rmdDate||"",
+    progresso:p.progress||0,
+    descricao:(p.desc||"").replace(/\r?\n/g," "),
+    notas:(p.notes||"").replace(/\r?\n/g," "),
+    arquivado:p.archived?"sim":"nao",
+  }));
+  const csv=Papa.unparse(rows);
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const today=new Date().toISOString().slice(0,10);
+  a.href=url;a.download=`esteira-valemobi-${today}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("⬇ CSV exportado",`${rows.length} demandas`);
+}
+
+let csvPreviewData=[];
+function handleCsvFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const result=Papa.parse(e.target.result,{header:true,skipEmptyLines:true});
+    if(result.errors?.length){
+      showToast("⚠️ Erro ao ler CSV",result.errors[0].message);
+      return;
+    }
+    csvPreviewData=result.data.map(row=>{
+      const code=(row.codigo||row.code||"").trim();
+      const existing=code?projects.find(p=>(p.code||"").trim().toLowerCase()===code.toLowerCase()):null;
+      return{
+        raw:row,
+        action:existing?"update":"create",
+        existingId:existing?.id||null,
+        name:(row.nome||row.name||"").trim(),
+        code,
+      };
+    }).filter(r=>r.name); // exige pelo menos um nome
+    openCsvImportModal();
+  };
+  reader.readAsText(file,"UTF-8");
+  document.getElementById("csvFileInput").value="";
+}
+
+function openCsvImportModal(){
+  const m=document.getElementById("csvImportModal");
+  const creates=csvPreviewData.filter(r=>r.action==="create").length;
+  const updates=csvPreviewData.filter(r=>r.action==="update").length;
+  document.getElementById("csvImportSummary").textContent=
+    `${csvPreviewData.length} linha(s) lida(s) — ${creates} nova(s) demanda(s) serão criadas, ${updates} existente(s) serão atualizadas (por código Jira).`;
+  document.getElementById("csvImportList").innerHTML=csvPreviewData.map(r=>
+    `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.2);border-radius:6px;padding:6px 10px;font-size:11px">
+      <span style="color:#EDEDF0">${r.name}${r.code?` <span style="color:#8B8D9B">(${r.code})</span>`:""}</span>
+      <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;${r.action==="create"?"background:rgba(122,155,107,.15);color:#7A9B6B":"background:rgba(217,142,63,.15);color:#E2A968"}">${r.action==="create"?"NOVO":"ATUALIZAR"}</span>
+    </div>`
+  ).join("")||'<div style="text-align:center;color:#55566A;padding:16px 0;font-size:11px">Nenhuma linha válida encontrada.</div>';
+  if(m)m.style.display="flex";
+}
+function closeCsvImportModal(){
+  const m=document.getElementById("csvImportModal");if(m)m.style.display="none";
+  csvPreviewData=[];
+}
+
+function confirmCsvImport(){
+  if(!csvPreviewData.length){closeCsvImportModal();return;}
+  const validStages=new Set(STAGES.map(s=>s.id));
+  const validPrio=new Set(Object.keys(PRIO));
+  let created=0,updated=0;
+
+  csvPreviewData.forEach(r=>{
+    const row=r.raw;
+    const stageRaw=(row.estagio||row.stage||"").trim().toLowerCase();
+    const stage=validStages.has(stageRaw)?stageRaw:(r.action==="update"?null:"escopo");
+    const prioRaw=(row.prioridade||row.priority||"").trim().toLowerCase();
+    const priority=validPrio.has(prioRaw)?prioRaw:(r.action==="update"?null:"normal");
+    const fields={
+      name:r.name,
+      code:r.code||"—",
+      owner:(row.owner||"").trim(),
+      dev:(row.dev||"").trim(),
+      qa:(row.qa||"").trim(),
+      rmdDate:(row.rdm||row.rmdDate||"").trim(),
+      desc:(row.descricao||row.desc||"").trim(),
+      notes:(row.notas||row.notes||"").trim(),
+    };
+    if(stage)fields.stage=stage;
+    if(priority)fields.priority=priority;
+    if(row.progresso!==undefined&&row.progresso!==""){
+      const pct=parseInt(row.progresso,10);
+      if(!isNaN(pct))fields.progress=Math.max(0,Math.min(100,pct));
+    }
+
+    if(r.action==="update"&&r.existingId){
+      setP(r.existingId,fields);
+      updated++;
+    } else {
+      const newStage=fields.stage||"escopo";
+      const newCard={
+        id:"card_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+        ...fields,stage:newStage,priority:fields.priority||"normal",
+        progress:fields.progress||0,
+        blockers:[],links:[],checks:{},dis:{},customTasks:{},taskText:{},
+        taskDates:{},taskNotified:{},meetings:[],deps:[],comments:[],
+        stageHistory:[{stage:newStage,enteredAt:new Date().toISOString()}],
+        jiraStatus:"",archived:false,
+      };
+      projects.push(newCard);addToOrder(newStage,newCard.id);
+      created++;
+    }
+  });
+
+  saveProjects();saveOrders();
+  renderBoard();renderStats();
+  closeCsvImportModal();
+  showToast("✅ Importação concluída",`${created} criada(s), ${updated} atualizada(s)`);
 }
 
 function renderEsteiraTrack(){
