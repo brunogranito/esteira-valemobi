@@ -5510,10 +5510,19 @@ function saveTaskText(tid,stage,isCustom){
       else setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
     }
   } else {
-    // Tarefa padrão: salva globalmente (reflete em todos os cards)
-    setGlobalTaskText(tid,newText);
-    // Também salva no card atual para consistência local
-    setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
+    // Tarefa padrão: pergunta o escopo da alteração
+    const choice=confirm(
+      `Como deseja salvar esta alteração?\n\n`+
+      `• OK = Alterar somente neste card\n`+
+      `• Cancelar = Alterar em TODOS os cards desta esteira (Tarefa Padrão)`
+    );
+    if(choice){
+      // Só este card: override local, não mexe na tarefa padrão global
+      setP(selId,{taskText:{...(p.taskText||{}),[tid]:newText}});
+    } else {
+      // Todos os cards: atualiza a Tarefa Padrão globalmente
+      setGlobalTaskText(tid,newText);
+    }
   }
   taskEditing=null;renderCheck();
 }
