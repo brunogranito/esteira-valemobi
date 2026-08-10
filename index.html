@@ -968,11 +968,39 @@ body.light .paci-name{color:#1C1D28}
 <!-- ADD CARD MODAL -->
 <div id="addCardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
   <div style="background:#1C1D28;border:1px solid rgba(85,86,106,.3);border-radius:12px;padding:24px;width:min(440px,100%);box-shadow:0 12px 32px rgba(0,0,0,.7)">
-    <div style="font-size:15px;font-weight:700;color:#EDEDF0;margin-bottom:16px">➕ Novo Card</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#EDEDF0">➕ Novo Card</div>
+      <button onclick="toggleAiCreate()" id="ncAiToggle" style="background:rgba(128,103,176,.15);border:1px solid rgba(128,103,176,.4);color:#B9A6D9;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">✨ Criar com IA</button>
+    </div>
+    <div id="ncAiBox" style="display:none;margin-bottom:14px;padding:10px;background:rgba(128,103,176,.08);border:1px solid rgba(128,103,176,.25);border-radius:8px">
+      <textarea id="ncAiInput" placeholder="Descreva em texto livre. Ex: Custódia Remunerada, alta prioridade, dev João, RDM dia 20/09, já em QA" style="width:100%;min-height:52px;background:rgba(20,21,31,.6);border:1px solid rgba(85,86,106,.35);color:#EDEDF0;border-radius:6px;padding:7px 9px;font-size:11px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span id="ncAiStatus" style="font-size:10px;color:#8B8D9B"></span>
+        <button onclick="interpretCardAI()" style="background:linear-gradient(90deg,#8067B0,#6B5590);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Interpretar</button>
+      </div>
+    </div>
     <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Nome da demanda *</label>
     <input id="ncName" class="mef-inp" placeholder="Ex: Custódia Remunerada" style="width:100%;margin-bottom:10px;box-sizing:border-box">
     <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Código Jira</label>
     <input id="ncCode" class="mef-inp" placeholder="Ex: BAPG-1234" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Owner</label>
+        <input id="ncOwner" class="mef-inp" list="pplListNc" placeholder="Responsável" style="width:100%;box-sizing:border-box">
+        <datalist id="pplListNc"></datalist>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Dev</label>
+        <input id="ncDev" class="mef-inp" list="pplListNc" placeholder="Desenvolvedor" style="width:100%;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">RDM (opcional)</label>
+        <input id="ncRmd" class="mef-inp" placeholder="dd/mm/aaaa" style="width:100%;box-sizing:border-box">
+      </div>
+      <div></div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       <div>
         <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Stage inicial</label>
@@ -3910,7 +3938,15 @@ function removeTaskAtDropdown(){
 /* ── ADD CARD MANUAL ────────────────────────────────────── */
 function openAddCardModal(){
   const m=document.getElementById('addCardModal');
-  if(m){m.style.display='flex';setTimeout(()=>document.getElementById('ncName')?.focus(),50);}
+  if(m){
+    m.style.display='flex';
+    const dl=document.getElementById('pplListNc');
+    if(dl)dl.innerHTML=getPeople().map(p=>`<option value="${p.name}">`).join('');
+    ['ncName','ncCode','ncOwner','ncDev','ncRmd','ncAiInput'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const aiBox=document.getElementById('ncAiBox');if(aiBox)aiBox.style.display='none';
+    const aiStatus=document.getElementById('ncAiStatus');if(aiStatus)aiStatus.textContent='';
+    setTimeout(()=>document.getElementById('ncName')?.focus(),50);
+  }
 }
 function closeAddCardModal(){
   const m=document.getElementById('addCardModal');if(m)m.style.display='none';
@@ -3921,18 +3957,61 @@ function confirmAddCard(){
   const code=(document.getElementById('ncCode')?.value||'').trim();
   const stage=document.getElementById('ncStage')?.value||'escopo';
   const priority=document.getElementById('ncPrio')?.value||'normal';
+  const owner=(document.getElementById('ncOwner')?.value||'').trim()||currentUser?.name||'';
+  const dev=(document.getElementById('ncDev')?.value||'').trim();
+  const rmdDate=(document.getElementById('ncRmd')?.value||'').trim();
   const newCard={
     id:'card_'+Date.now(),name,code:code||'—',stage,priority,
-    owner:'Bruno Granito',qa:'',dev:'',progress:0,notes:'',desc:'',
+    owner,qa:'',dev,progress:0,notes:'',desc:'',
     blockers:[],links:[],checks:{},dis:{},customTasks:{},taskText:{},
-    taskDates:{},taskNotified:{},meetings:[],deps:[],
+    taskDates:{},taskNotified:{},meetings:[],deps:[],comments:[],
     stageHistory:[{stage,enteredAt:new Date().toISOString()}],
-    rmdDate:'',jiraStatus:'',archived:false,
+    rmdDate,jiraStatus:'',archived:false,
   };
   projects.push(newCard);addToOrder(stage,newCard.id);
   saveProjects();saveOrders();
   renderBoard();renderStats();closeAddCardModal();
   openModal(newCard.id);showToast('✅ Card criado',name);
+}
+
+/* ── CRIAÇÃO DE CARD POR LINGUAGEM NATURAL (IA) ──────── */
+function toggleAiCreate(){
+  const box=document.getElementById('ncAiBox');
+  if(!box)return;
+  box.style.display=box.style.display==='none'?'block':'none';
+  if(box.style.display==='block')setTimeout(()=>document.getElementById('ncAiInput')?.focus(),50);
+}
+
+async function interpretCardAI(){
+  const input=(document.getElementById('ncAiInput')?.value||'').trim();
+  const status=document.getElementById('ncAiStatus');
+  if(!input){if(status)status.textContent='Descreva o card primeiro.';return;}
+  if(!apiKey){if(status)status.textContent='⚠️ Configure a API Key da Anthropic (⚙ no cabeçalho) antes de usar a IA.';return;}
+  if(status)status.textContent='Interpretando…';
+
+  const stageIds=STAGES.map(s=>s.id).join(', ');
+  const system=`Você extrai dados estruturados de uma descrição em texto livre de uma demanda de projeto (equipe de RV — Renda Variável, Valemobi).
+Responda SOMENTE com um objeto JSON válido, sem markdown, sem texto antes ou depois, com exatamente estas chaves:
+{"name": string (nome curto da demanda), "code": string ou "" (código Jira tipo BAPD-1234 ou BAPG-1234, se mencionado), "stage": um destes valores exatos [${stageIds}] (o mais provável dado o contexto; se não houver pista, use "escopo"), "priority": um de ["urgent","high","normal","low"], "owner": string ou "" (responsável/owner, se mencionado), "dev": string ou "" (desenvolvedor, se mencionado), "rmdDate": string ou "" (data no formato dd/mm/aaaa, se mencionada)}
+Não invente informação que não esteja no texto — deixe campo vazio ("") quando não for possível inferir.`;
+
+  try{
+    const raw=await callClaude(system,[{role:'user',content:input}]);
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const data=JSON.parse(clean);
+
+    if(data.name)document.getElementById('ncName').value=data.name;
+    if(data.code)document.getElementById('ncCode').value=data.code;
+    if(data.stage&&STAGES.some(s=>s.id===data.stage))document.getElementById('ncStage').value=data.stage;
+    if(data.priority&&PRIO[data.priority])document.getElementById('ncPrio').value=data.priority;
+    if(data.owner)document.getElementById('ncOwner').value=data.owner;
+    if(data.dev)document.getElementById('ncDev').value=data.dev;
+    if(data.rmdDate)document.getElementById('ncRmd').value=data.rmdDate;
+
+    if(status)status.textContent='✅ Preenchido — revise antes de criar.';
+  }catch(e){
+    if(status)status.textContent='⚠️ Não consegui interpretar. Preencha manualmente ou tente reformular.';
+  }
 }
 
 /* ── TASKS PANEL (sidebar 📋) ───────────────────────────── */
