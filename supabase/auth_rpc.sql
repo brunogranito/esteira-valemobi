@@ -25,8 +25,9 @@ revoke select, insert, update, delete on public.app_users from authenticated;
 -- 3) Função de LOGIN: recebe e-mail + hash da senha, retorna o usuário
 --    SOMENTE se o hash bater. Roda com privilégio do dono (SECURITY
 --    DEFINER), então consegue ler a tabela mesmo com RLS ativo.
+drop function if exists public.login_user(text, text);
 create or replace function public.login_user(p_email text, p_hash text)
-returns table(id uuid, email text, name text, role text)
+returns table(id text, email text, name text, role text)
 language plpgsql
 security definer
 set search_path = public
@@ -44,8 +45,9 @@ grant execute on function public.login_user(text, text) to anon;
 
 -- 4) Função de REGISTRO: cria o usuário se o e-mail ainda não existir.
 --    Lança uma exceção 'EMAIL_EXISTS' se já houver conta com esse e-mail.
+drop function if exists public.register_user(text, text, text);
 create or replace function public.register_user(p_email text, p_name text, p_hash text)
-returns table(id uuid, email text, name text, role text)
+returns table(id text, email text, name text, role text)
 language plpgsql
 security definer
 set search_path = public
@@ -66,7 +68,9 @@ revoke all on function public.register_user(text, text, text) from public;
 grant execute on function public.register_user(text, text, text) to anon;
 
 -- 5) Função para atualizar o último login (sem precisar de UPDATE direto)
-create or replace function public.update_last_login(p_id uuid)
+drop function if exists public.update_last_login(text);
+drop function if exists public.update_last_login(uuid);
+create or replace function public.update_last_login(p_id text)
 returns void
 language sql
 security definer
@@ -75,8 +79,8 @@ as $$
   update app_users set last_login = now() where id = p_id;
 $$;
 
-revoke all on function public.update_last_login(uuid) from public;
-grant execute on function public.update_last_login(uuid) to anon;
+revoke all on function public.update_last_login(text) from public;
+grant execute on function public.update_last_login(text) to anon;
 
 -- ═══════════════════════════════════════════════════════════════
 -- IMPORTANTE — depois de rodar este script:
