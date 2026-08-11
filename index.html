@@ -5682,20 +5682,17 @@ function renderReports(){
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('status')">⬇ PDF</button>
   </div>
   <div style="font-size:11px;color:#8B8D9B;margin-bottom:10px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:8px">
+  <div style="border:1px solid rgba(85,86,106,.25);border-radius:8px;overflow:hidden;margin-bottom:8px">
     ${withStatus.map(p=>{
       const st=STAGES.find(s=>s.id===p.stage);
-      return`<div style="background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.25);border-left:3px solid ${st?.color||"#D98E3F"};border-radius:8px;padding:11px 13px;cursor:pointer" onclick="closeReportsPanel();openModal('${p.id}')">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;gap:8px">
-          <div style="min-width:0">
-            <div style="font-size:12px;font-weight:700;color:#EDEDF0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-            <div style="font-size:9px;color:#55566A;font-family:monospace">${p.code}</div>
-          </div>
-          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
-        </div>
-        ${p.blockers.map(b=>`<div style="font-size:11px;color:#D6D7E0;padding:3px 0 3px 15px;position:relative;line-height:1.4"><span style="position:absolute;left:0;font-size:9px">📌</span>${b}</div>`).join("")}
+      const statusTxt=p.blockers.join(" · ");
+      return`<div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-left:3px solid ${st?.color||"#D98E3F"};border-bottom:1px solid rgba(85,86,106,.15);cursor:pointer" onclick="closeReportsPanel();openModal('${p.id}')">
+        <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+        <span style="flex-shrink:0;font-size:12px;font-weight:600;color:#EDEDF0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.name}">${p.name}</span>
+        <span style="flex-shrink:0;font-size:9px;color:#55566A;font-family:monospace;white-space:nowrap">${p.code}</span>
+        <span style="flex:1;min-width:0;font-size:11px;color:#A5A7B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${statusTxt}">📌 ${statusTxt}</span>
       </div>`;
-    }).join("")||'<div style="grid-column:1/-1;text-align:center;color:#55566A;padding:20px;font-size:11px">Nenhuma demanda com status atual registrado no momento.</div>'}
+    }).join("")||'<div style="text-align:center;color:#55566A;padding:20px;font-size:11px">Nenhuma demanda com status atual registrado no momento.</div>'}
   </div>`;
 
   // Checklist — same stage ordering
@@ -5803,16 +5800,16 @@ function exportPDF(type){
     </tbody></table>`;
   } else if(type==="status"){
     const withStatus=byStage(active).filter(p=>p.blockers?.length>0);
-    content=`<p style="font-size:11px;color:#8B8D9B;margin-bottom:16px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</p>
-    <div class="status-grid">
+    content=`<p style="font-size:11px;color:#8B8D9B;margin-bottom:10px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</p>
+    <div class="status-list">
     ${withStatus.map(p=>{
       const st=STAGES.find(s=>s.id===p.stage);
-      return`<div class="status-card" style="border-left-color:${st?.color||"#D98E3F"}">
-        <div class="status-card-hd">
-          <div><span class="status-card-name">${p.name}</span><span class="status-card-code">${p.code}</span></div>
-          <span class="status-card-stage" style="color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
-        </div>
-        ${p.blockers.map(b=>`<div class="status-card-item">${b}</div>`).join("")}
+      const statusTxt=p.blockers.join(" · ");
+      return`<div class="status-row" style="border-left-color:${st?.color||"#D98E3F"}">
+        <span class="status-chip" style="background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+        <span class="status-name">${p.name}</span>
+        <span class="status-code">${p.code}</span>
+        <span class="status-txt">📌 ${statusTxt}</span>
       </div>`;
     }).join("")}
     </div>`;
@@ -5847,14 +5844,13 @@ function exportPDF(type){
     tr.done td{color:#A5A7B8}
     .mono{font-family:monospace;font-size:10px;color:#A5A7B8}
     .blk{color:#B5701F;font-weight:600}
-    .status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px}
-    .status-card{background:#F5F3EE;border:1px solid #EDEBE3;border-left:4px solid #D98E3F;border-radius:8px;padding:14px 16px}
-    .status-card-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-    .status-card-name{font-size:13px;font-weight:700;color:#14151F}
-    .status-card-code{font-size:9px;color:#A5A7B8;font-family:monospace;display:block;margin-top:2px}
-    .status-card-stage{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
-    .status-card-item{font-size:11px;color:#2C2D3C;padding:4px 0 4px 16px;position:relative;line-height:1.4}
-    .status-card-item:before{content:"📌";position:absolute;left:-2px;font-size:9px}
+    .status-list{border:1px solid #EDEBE3;border-radius:8px;overflow:hidden;margin-bottom:20px}
+    .status-row{display:flex;align-items:center;gap:9px;padding:6px 12px;border-left:3px solid #D98E3F;border-bottom:1px solid #EDEBE3}
+    .status-row:last-child{border-bottom:none}
+    .status-chip{flex-shrink:0;font-size:8px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap}
+    .status-name{flex-shrink:0;font-size:11px;font-weight:700;color:#14151F;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .status-code{flex-shrink:0;font-size:8px;color:#A5A7B8;font-family:monospace;white-space:nowrap}
+    .status-txt{flex:1;min-width:0;font-size:10px;color:#5A5744;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .bar{display:inline-block;width:70px;height:5px;background:#EDEDF0;border-radius:3px;vertical-align:middle;overflow:hidden}
     .bar-fill{height:100%;background:linear-gradient(90deg,#D98E3F,#B5701F);border-radius:3px}
     .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
