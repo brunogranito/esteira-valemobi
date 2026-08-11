@@ -3515,6 +3515,18 @@ function dragOverTask(e,tid,stage){
   e.preventDefault();
   e.dataTransfer.dropEffect='move';
 }
+// Resolve texto e seção original de uma tarefa NATIVA (definida em CL) ou PERMANENTE,
+// necessário para poder movê-la de seção (elas não vivem em customTasks/injectedTasks)
+function resolveTaskInfo(stage,tid){
+  const clSections=CL[stage]||[];
+  for(const sec of clSections){
+    const found=(sec.t||[]).find(t=>t.id===tid);
+    if(found)return{tx:found.tx,section:sec.s};
+  }
+  const perm=(getPermanentTasks()[stage]||[]).find(t=>t.tid===tid);
+  if(perm)return{tx:perm.tx,section:perm.sectionS};
+  return{tx:tid,section:null};
+}
 function dropOnAnyTask(e,toTid,stageId,sectionKey){
   e.preventDefault();e.stopPropagation();
   if(!dragTaskId||dragTaskId===toTid)return;
@@ -3525,7 +3537,7 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
   // que fica desatualizado assim que a tarefa muda de lugar — causa da 1ª trava relatada)
   const customArr=(p.customTasks||{})[dragTaskStage]||[];
   const isFromCustom=customArr.some(t=>t.tid===dragTaskId);
-  let fromSection=null; // nome da seção padrão onde já está injetada, se for o caso
+  let fromSection=null; // nome da seção onde a tarefa está atualmente (injetada, nativa ou permanente)
   if(!isFromCustom){
     const stageInj=(p.injectedTasks||{})[dragTaskStage]||{};
     Object.keys(stageInj).forEach(sec=>{
@@ -3533,7 +3545,13 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
     });
   }
   const isFromInjected=fromSection!==null;
-  const isMovable=isFromCustom||isFromInjected; // só tarefas custom/injetadas podem mudar de seção
+  // Se não é custom nem já injetada, é uma tarefa NATIVA (CL) ou PERMANENTE — resolve onde ela
+  // "mora" originalmente, pra também poder movê-la de seção (isso faltava e travava o 2º cenário relatado)
+  let nativeInfo=null;
+  if(!isFromCustom&&!isFromInjected){
+    nativeInfo=resolveTaskInfo(dragTaskStage,dragTaskId);
+    fromSection=nativeInfo.section;
+  }
 
   // ── Voltar para a área "Tarefas adicionadas" (custom) ──────
   if(secS==='__custom__'){
@@ -3564,11 +3582,12 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
     return; // tarefa padrão/permanente não pode ir pra área custom
   }
 
-  // ── Movendo PARA uma seção padrão: 1ª injeção (custom→padrão) OU
-  //    mudança de seção de uma tarefa já injetada (resolve a 2ª trava relatada) ──
-  if(isMovable && fromSection!==secS){
+  // ── Movendo PARA uma seção padrão diferente: 1ª injeção (custom→padrão), tarefa já
+  //    injetada mudando de seção, OU tarefa nativa/permanente mudando de seção ──
+  if(fromSection!==secS){
     const newCT=JSON.parse(JSON.stringify(p.customTasks||{}));
     const injected=JSON.parse(JSON.stringify(p.injectedTasks||{}));
+    const hidden={...(p.taskHidden||{})};
     let taskTx=null;
     if(isFromCustom){
       const idx=(newCT[dragTaskStage]||[]).findIndex(t=>t.tid===dragTaskId);
@@ -3577,6 +3596,10 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
       const arr=(injected[dragTaskStage]||{})[fromSection]||[];
       const idx=arr.findIndex(t=>t.tid===dragTaskId);
       if(idx>=0){taskTx=arr[idx].tx;arr.splice(idx,1);}
+    } else if(nativeInfo){
+      // Tarefa nativa ou permanente: oculta da seção original (só neste card) e injeta cópia na seção destino
+      taskTx=nativeInfo.tx;
+      hidden[dragTaskId]=true;
     }
     if(taskTx===null)return;
     if(!injected[sId])injected[sId]={};
@@ -3585,7 +3608,7 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
     const toIdx=toIds.indexOf(toTid);
     secList.splice(toIdx<0?secList.length:toIdx,0,{tid:dragTaskId,tx:taskTx});
     injected[sId][secS]=secList;
-    setP(selId,{customTasks:newCT,injectedTasks:injected});
+    setP(selId,{customTasks:newCT,injectedTasks:injected,taskHidden:hidden});
     renderCheck();return;
   }
 
@@ -5293,8 +5316,6 @@ function renderCheck(){
 
   sections.forEach((sec,sIdx)=>{
     const tasks=sec.t||[];
-    const notDis=tasks.filter(t=>!(p.dis||{})[t.id]);
-    const done=notDis.filter(t=>(p.checks||{})[t.id]).length;
     const secLabel=(p.customSections||{})[active]?.[sIdx]||sec.s;
     // Aplica ordem a TODOS os tasks da seção (padrão + injected + permanentes)
     const taskOrder=getTaskOrder(p,active,sec.s);
@@ -5320,13 +5341,18 @@ function renderCheck(){
     const taskIds=allSecTasks.map(t=>t.id);
     // Store for drag-drop
     _sectionTaskIds[active+'|||'+sec.s]=taskIds;
+    // Contagem considera TODAS as tarefas visíveis nesta seção (nativas + permanentes + injetadas),
+    // não só nativas — senão o contador ficava errado ao mover/injetar tarefas entre seções
+    const _visibleSecTasks=allSecTasks.filter(t=>t.isInjected||!(p.taskHidden||{})[t.id]);
+    const _visibleNotDis=_visibleSecTasks.filter(t=>!(p.dis||{})[t.id]);
+    const _visibleDone=_visibleNotDis.filter(t=>(p.checks||{})[t.id]).length;
     h+=`<div class="cl-sec"><div class="cl-sec-hd">
       <span id="sec-label-${active}-${sIdx}">${secLabel}</span>
       <button onclick="startEditSection('${active}',${sIdx},'${escOnclick(secLabel)}')"
         style="background:none;border:none;color:#2C2D3C;cursor:pointer;font-size:11px;margin-left:4px;opacity:0;transition:opacity .15s"
         onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0" title="Editar nome da seção">✏</button>
       <div style="display:flex;align-items:center;gap:7px;margin-left:auto">
-        <span class="cl-sec-pct">${done}/${notDis.length}</span>
+        <span class="cl-sec-pct">${_visibleDone}/${_visibleNotDis.length}</span>
         <button class="add-sec-btn" onclick="showAddTask('${sec.s}','${active}')">+</button>
       </div>
     </div>`;
@@ -5335,8 +5361,9 @@ function renderCheck(){
       const _gTxt=(getGlobalTaskText()||{})[task.id];
       const fullTask=isExtra?{id:task.id,tx:task.tx,info:null,links:[]}:
                               {...task,tx:_gTxt||(p.taskText||{})[task.id]||task.tx};
-      // Skip hidden tasks
-      if((p.taskHidden||{})[task.id])return;
+      // Esconde a ORIGEM nativa/permanente oculta (taskHidden), mas nunca uma cópia injetada —
+      // senão mover uma tarefa nativa pra outra seção também some com a cópia no destino
+      if(!task.isInjected&&(p.taskHidden||{})[task.id])return;
       h+=renderTaskRow(p,task.id,fullTask,isExtra,active,sec.s,taskIds,_taskIdx);
     });
     h+=`</div>`;
