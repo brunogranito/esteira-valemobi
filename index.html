@@ -2522,10 +2522,21 @@ async function connectMs(){
 /* ── EDITABLE MENU DATA ──────────────────────────────── */
 let menuData = { systems: null, people: null, templates: null };
 
-function loadMenuData(){
+async function loadMenuData(){
+  // Local primeiro (mostra algo na hora), depois busca a versão mais recente do Supabase em segundo plano
   menuData.systems = lsGet('menuSystems') || null;
   menuData.people  = lsGet('menuPeople')  || null;
   menuData.templates = lsGet('menuTemplates') || null;
+  try{
+    const [sbSystems,sbPeople,sbTemplates]=await Promise.all([
+      sbGet('menu_systems'),sbGet('menu_people'),sbGet('menu_templates')
+    ]);
+    if(sbSystems){menuData.systems=sbSystems;lsSet('menuSystems',sbSystems);}
+    if(sbPeople){menuData.people=sbPeople;lsSet('menuPeople',sbPeople);}
+    if(sbTemplates){menuData.templates=sbTemplates;lsSet('menuTemplates',sbTemplates);}
+    // Re-renderiza caso algum painel que dependa dessas listas já esteja aberto
+    if(document.getElementById('menuOverlay')?.classList.contains('open'))renderMenuPanel();
+  }catch(e){}
 }
 function getSystems()  { return menuData.systems   || SYSTEMS;   }
 function getPeople()   { return menuData.people    || PEOPLE;    }
