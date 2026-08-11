@@ -5676,6 +5676,28 @@ function renderReports(){
   });
   h+=`</tbody></table>`;
 
+  // Status Atual — visão dedicada, card por card
+  const withStatus=byStage(active).filter(p=>p.blockers?.length>0);
+  h+=`<div class="rpt-section-title">📌 Status Atual — Card por Card
+    <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('status')">⬇ PDF</button>
+  </div>
+  <div style="font-size:11px;color:#8B8D9B;margin-bottom:10px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:8px">
+    ${withStatus.map(p=>{
+      const st=STAGES.find(s=>s.id===p.stage);
+      return`<div style="background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.25);border-left:3px solid ${st?.color||"#D98E3F"};border-radius:8px;padding:11px 13px;cursor:pointer" onclick="closeReportsPanel();openModal('${p.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;gap:8px">
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:700;color:#EDEDF0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+            <div style="font-size:9px;color:#55566A;font-family:monospace">${p.code}</div>
+          </div>
+          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+        </div>
+        ${p.blockers.map(b=>`<div style="font-size:11px;color:#D6D7E0;padding:3px 0 3px 15px;position:relative;line-height:1.4"><span style="position:absolute;left:0;font-size:9px">📌</span>${b}</div>`).join("")}
+      </div>`;
+    }).join("")||'<div style="grid-column:1/-1;text-align:center;color:#55566A;padding:20px;font-size:11px">Nenhuma demanda com status atual registrado no momento.</div>'}
+  </div>`;
+
   // Checklist — same stage ordering
   h+=`<div class="rpt-section-title">☑️ Checklist por Demanda
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('checklist')">⬇ PDF</button>
@@ -5748,7 +5770,7 @@ function exportPDF(type){
   const active=projects.filter(p=>!p.archived);
   const byStage=(arr)=>[...arr].sort((a,b)=>{const si=i=>STAGES.findIndex(s=>s.id===i);return si(b.stage)-si(a.stage)||b.progress-a.progress;});
   const now=new Date().toLocaleString("pt-BR");
-  const titles={geral:"Resumo Geral",stage:"Demandas por Stage",andamento:"Andamento por Demanda",checklist:"Checklist por Demanda",semanal:"Relatório Semanal"};
+  const titles={geral:"Resumo Geral",stage:"Demandas por Stage",andamento:"Andamento por Demanda",checklist:"Checklist por Demanda",status:"Status Atual — Card por Card",semanal:"Relatório Semanal"};
   let content="";
 
   if(type==="geral"){
@@ -5779,6 +5801,21 @@ function exportPDF(type){
     content=`<table><thead><tr><th>Demanda</th><th>Código</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Owner</th><th>Status Atual</th></tr></thead><tbody>
     ${byStage(active).map(p=>{const st=STAGES.find(s=>s.id===p.stage);return`<tr class="${p.progress>=100?"done":""}"><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${st?.label||""}</td><td>${PRIO[p.priority]?.label||""}</td><td><div class="bar"><div class="bar-fill" style="width:${p.progress}%"></div></div> ${p.progress}%</td><td>${p.owner||"—"}</td><td class="${p.blockers?.length?"blk":""}">${p.blockers?.length?p.blockers.join("; "):"—"}</td></tr>`;}).join("")}
     </tbody></table>`;
+  } else if(type==="status"){
+    const withStatus=byStage(active).filter(p=>p.blockers?.length>0);
+    content=`<p style="font-size:11px;color:#8B8D9B;margin-bottom:16px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</p>
+    <div class="status-grid">
+    ${withStatus.map(p=>{
+      const st=STAGES.find(s=>s.id===p.stage);
+      return`<div class="status-card" style="border-left-color:${st?.color||"#D98E3F"}">
+        <div class="status-card-hd">
+          <div><span class="status-card-name">${p.name}</span><span class="status-card-code">${p.code}</span></div>
+          <span class="status-card-stage" style="color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+        </div>
+        ${p.blockers.map(b=>`<div class="status-card-item">${b}</div>`).join("")}
+      </div>`;
+    }).join("")}
+    </div>`;
   } else if(type==="checklist"){
     content=`<table><thead><tr><th>Demanda</th><th>Stage</th><th>Tarefas Concl.</th><th>Pendentes</th><th>Checklist %</th><th>Progresso Geral</th></tr></thead><tbody>`;
     byStage(active).forEach(p=>{
@@ -5809,7 +5846,15 @@ function exportPDF(type){
     tr:hover td{background:#F5F3EE}
     tr.done td{color:#A5A7B8}
     .mono{font-family:monospace;font-size:10px;color:#A5A7B8}
-    .blk{color:#ef4444}
+    .blk{color:#B5701F;font-weight:600}
+    .status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px}
+    .status-card{background:#F5F3EE;border:1px solid #EDEBE3;border-left:4px solid #D98E3F;border-radius:8px;padding:14px 16px}
+    .status-card-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+    .status-card-name{font-size:13px;font-weight:700;color:#14151F}
+    .status-card-code{font-size:9px;color:#A5A7B8;font-family:monospace;display:block;margin-top:2px}
+    .status-card-stage{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+    .status-card-item{font-size:11px;color:#2C2D3C;padding:4px 0 4px 16px;position:relative;line-height:1.4}
+    .status-card-item:before{content:"📌";position:absolute;left:-2px;font-size:9px}
     .bar{display:inline-block;width:70px;height:5px;background:#EDEDF0;border-radius:3px;vertical-align:middle;overflow:hidden}
     .bar-fill{height:100%;background:linear-gradient(90deg,#D98E3F,#B5701F);border-radius:3px}
     .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
