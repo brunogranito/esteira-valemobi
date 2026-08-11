@@ -5411,7 +5411,8 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds,_taskNum
              onchange="toggleCk('${tid}',this.checked,'${activeStage}')">`;
   if(isEditing){
     h+=`<input class="task-edit-inp" id="editInp-${tid}" value="${(task.tx||'').replace(/"/g,'&quot;')}"
-          onkeydown="if(event.key==='Enter')saveTaskText('${tid}','${activeStage}',${isCustom});if(event.key==='Escape')cancelEditTask()">`;
+          onkeydown="if(event.key==='Enter')saveTaskText('${tid}','${activeStage}',${isCustom});if(event.key==='Escape')cancelEditTask()"
+          onblur="cancelEditTask()">`;
   } else {
     // Use global override → per-card override → task default text
     const _globalTxt=(typeof getGlobalTaskText==='function'?getGlobalTaskText():{})[tid];
