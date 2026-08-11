@@ -828,8 +828,8 @@ body.light .paci-name{color:#1C1D28}
     </div>
     <div class="tabs">
       <button class="tab active" onclick="sw('info')">Informações</button>
-      <button class="tab" onclick="sw('cmt')">💬 Comentários</button>
       <button class="tab" onclick="sw('check')">✓ Checklist</button>
+      <button class="tab" onclick="sw('cmt')">💬 Comentários</button>
       <button class="tab" onclick="sw('ia')">✦ IA</button>
       <button class="tab" onclick="sw('jira')">🔗 Jira</button>
       <button class="tab" onclick="sw('mtg')">📝 Reuniões</button>
@@ -5073,7 +5073,7 @@ function closeModal(){document.getElementById("modalBg").classList.remove("open"
 function renderModal(){
   const p=getP(selId);if(!p)return;
   // Fix 4: sempre resetar visual das abas para Informações ao abrir
-  const tabs=["info","cmt","check","ia","jira","mtg","dep"];
+  const tabs=["info","check","cmt","ia","jira","mtg","dep"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===curTab));
   const st=STAGES.find(s=>s.id===p.stage);
   document.getElementById("mCode").innerHTML=`<span onclick="startEditCode()" title="Clique para editar" style="cursor:text;border-bottom:1px dashed rgba(217,142,63,.4)">${p.code}</span>`;
@@ -5116,7 +5116,7 @@ function moveStage(sid){
 
 function sw(t){
   curTab=t;
-  const tabs=["info","cmt","check","ia","jira","mtg","dep"];
+  const tabs=["info","check","cmt","ia","jira","mtg","dep"];
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("active",tabs[i]===t));
   renderTab();
 }
