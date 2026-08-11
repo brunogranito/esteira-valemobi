@@ -2217,18 +2217,70 @@ function getAllTags(){
   return[...set].sort();
 }
 
-// Destaca @menções (ambar) e #tags (azul, clicável para buscar) em texto exibido (somente leitura)
+// Destaca @menções (ambar, com card ao passar o mouse) e #tags (azul, clicável) em texto exibido
 function highlightMentionsAndTags(text){
   const esc=(text||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  // Uma única passada: evita que a cor hex inserida pelo próprio destaque (ex: #E2A968)
-  // seja capturada de novo como se fosse uma #tag numa segunda passada de replace
-  return esc.replace(/([@#])(\w+)/g,(m,sym,word)=>{
-    if(sym==="@")return`<span style="color:#E2A968;font-weight:600">@${word}</span>`;
-    return`<span style="color:#5FA8B0;font-weight:600;cursor:pointer" onclick="event.stopPropagation();searchByTag('${word}')">#${word}</span>`;
+  const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const names=getPeople().map(p=>p.name).filter(Boolean).sort((a,b)=>b.length-a.length);
+
+  // PASSO 1: reconhece @NomeCompleto (pessoas cadastradas), usa tokens temporários pra não
+  // ser reprocessado no passo 2 (senão "@Ageu Doria" viraria "@Ageu" destacado + "Doria" solto)
+  const placeholders=[];
+  let work=esc;
+  if(names.length){
+    const namePattern=names.map(escRe).join("|");
+    work=work.replace(new RegExp("@("+namePattern+")","g"),(m,name)=>{
+      const safe=name.replace(/'/g,"\\'");
+      const html=`<span class="mention-chip" style="color:#E2A968;font-weight:600;cursor:default;border-bottom:1px dotted rgba(226,169,104,.5)" onmouseenter="showPersonCard(event,'${safe}')" onmouseleave="hidePersonCard()">@${name}</span>`;
+      const token="\u0000"+placeholders.length+"\u0000";
+      placeholders.push(html);
+      return token;
+    });
+  }
+
+  // PASSO 2: #tags e @menções que não bateram com nenhum nome cadastrado (texto livre)
+  work=work.replace(/([@#])(\w+)/g,(m,sym,word)=>{
+    if(sym==="#")return`<span style="color:#5FA8B0;font-weight:600;cursor:pointer" onclick="event.stopPropagation();searchByTag('${word}')">#${word}</span>`;
+    return`<span style="color:#E2A968;font-weight:600">@${word}</span>`;
   });
+
+  // Restaura os cards de menção reconhecidos
+  work=work.replace(/\u0000(\d+)\u0000/g,(m,i)=>placeholders[+i]);
+  return work;
 }
 // Alias — mantém compatibilidade com o nome usado nos comentários
 function highlightMentions(text){return highlightMentionsAndTags(text);}
+
+/* ── Card flutuante com dados da pessoa, ao passar o mouse numa @menção ── */
+let _personCardTimer=null;
+function showPersonCard(e,name){
+  clearTimeout(_personCardTimer);
+  const el=e.currentTarget;
+  _personCardTimer=setTimeout(()=>{
+    const p=getPeople().find(pp=>pp.name===name);
+    if(!p)return;
+    let card=document.getElementById("personCard");
+    if(!card){
+      card=document.createElement("div");
+      card.id="personCard";
+      card.style.cssText="position:fixed;z-index:10000;background:#1C1D28;border:1px solid rgba(85,86,106,.4);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:10px 14px;font-family:'Inter',sans-serif;pointer-events:none;max-width:240px";
+      document.body.appendChild(card);
+    }
+    const orgLabel={vm:"Valemobi",ag:"Ágora",br:"Bradesco"}[p.org]||p.org||"";
+    card.innerHTML=`<div style="font-size:12px;font-weight:700;color:#EDEDF0;margin-bottom:2px">${p.name}</div>
+      <div style="font-size:11px;color:#8B8D9B">${p.role||"Cargo não informado"}</div>
+      ${orgLabel?`<div style="font-size:9px;color:#55566A;margin-top:5px;text-transform:uppercase;letter-spacing:.4px">${orgLabel}</div>`:""}`;
+    const rect=el.getBoundingClientRect();
+    card.style.left=Math.round(rect.left)+"px";
+    card.style.top=Math.round(rect.bottom+6)+"px";
+    card.style.display="block";
+  },1200);
+}
+function hidePersonCard(){
+  clearTimeout(_personCardTimer);
+  const card=document.getElementById("personCard");
+  if(card)card.style.display="none";
+}
 
 function searchByTag(tag){
   const bar=document.getElementById("searchBar");
@@ -2275,7 +2327,7 @@ function _sugShow(el,type,query,triggerStart){
   if(type==="@"){
     const q=query.toLowerCase();
     items=getPeople().filter(p=>p.name.toLowerCase().includes(q)).slice(0,8)
-      .map(p=>({label:"@"+p.name,sub:p.role||"",insert:"@"+p.name.split(" ")[0]+" "}));
+      .map(p=>({label:"@"+p.name,sub:p.role||"",insert:"@"+p.name+" "}));
   } else {
     const q=query.toLowerCase();
     const allTags=getAllTags();
