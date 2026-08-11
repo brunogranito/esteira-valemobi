@@ -2201,11 +2201,148 @@ function renderDeps(){
 function addDep(did){if(!did)return;const p=getP(selId);const deps=[...(p.deps||[]),did];setP(selId,{deps});renderDeps();}
 function removeDep(did){const p=getP(selId);setP(selId,{deps:(p.deps||[]).filter(d=>d!==did)});renderDeps();}
 
-/* ── COMENTÁRIOS ──────────────────────────────────────── */
-function highlightMentions(text){
-  const esc=(text||'').replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  return esc.replace(/@(\w+)/g,'<span style="color:#E2A968;font-weight:600">@$1</span>');
+/* ── @MENÇÕES E #TAGS — sistema universal (funciona em qualquer campo de texto do sistema) ── */
+
+// Coleta todas as #tags já usadas em qualquer lugar (notas, descrição, status atual, comentários)
+function getAllTags(){
+  const set=new Set();
+  const re=/#(\w+)/g;
+  projects.forEach(p=>{
+    const texts=[p.notes,p.desc,...(p.blockers||[]),...(p.comments||[]).map(c=>c.text)];
+    texts.forEach(t=>{
+      if(!t)return;
+      let m;while((m=re.exec(t)))set.add(m[1]);
+    });
+  });
+  return[...set].sort();
 }
+
+// Destaca @menções (ambar) e #tags (azul, clicável para buscar) em texto exibido (somente leitura)
+function highlightMentionsAndTags(text){
+  const esc=(text||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // Uma única passada: evita que a cor hex inserida pelo próprio destaque (ex: #E2A968)
+  // seja capturada de novo como se fosse uma #tag numa segunda passada de replace
+  return esc.replace(/([@#])(\w+)/g,(m,sym,word)=>{
+    if(sym==="@")return`<span style="color:#E2A968;font-weight:600">@${word}</span>`;
+    return`<span style="color:#5FA8B0;font-weight:600;cursor:pointer" onclick="event.stopPropagation();searchByTag('${word}')">#${word}</span>`;
+  });
+}
+// Alias — mantém compatibilidade com o nome usado nos comentários
+function highlightMentions(text){return highlightMentionsAndTags(text);}
+
+function searchByTag(tag){
+  const bar=document.getElementById("searchBar");
+  if(bar){bar.value="#"+tag;bar.focus();}
+  globalSearch("#"+tag);
+}
+
+// Campos onde o autocomplete de @ e # NUNCA deve disparar (e-mail, senha, busca, etc.)
+function _sugExcluded(el){
+  if(!el)return true;
+  const tag=(el.tagName||"").toLowerCase();
+  if(tag!=="textarea"&&tag!=="input")return true;
+  if(el.type&&["email","password","number","date","search"].includes(el.type))return true;
+  if(el.id==="searchBar")return true;
+  const idn=(el.id||"")+" "+(el.name||"")+" "+(el.placeholder||"");
+  if(/e-?mail/i.test(idn))return true;
+  if(el.classList?.contains("no-suggest"))return true;
+  return false;
+}
+
+let _sugState=null; // {type,el,triggerStart,items,activeIdx}
+
+function _sugBox(){
+  let box=document.getElementById("sugBox");
+  if(!box){
+    box=document.createElement("div");
+    box.id="sugBox";
+    box.style.cssText="position:fixed;z-index:9999;background:#1C1D28;border:1px solid rgba(85,86,106,.4);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.55);max-height:220px;overflow-y:auto;display:none;font-family:'Inter',sans-serif";
+    document.body.appendChild(box);
+  }
+  return box;
+}
+function _sugClose(){
+  const box=document.getElementById("sugBox");
+  if(box)box.style.display="none";
+  _sugState=null;
+}
+function _sugHighlight(){
+  const box=document.getElementById("sugBox");if(!box||!_sugState)return;
+  [...box.children].forEach((c,i)=>{c.style.background=i===_sugState.activeIdx?"rgba(217,142,63,.15)":"transparent";});
+}
+function _sugShow(el,type,query,triggerStart){
+  let items=[];
+  if(type==="@"){
+    const q=query.toLowerCase();
+    items=getPeople().filter(p=>p.name.toLowerCase().includes(q)).slice(0,8)
+      .map(p=>({label:"@"+p.name,sub:p.role||"",insert:"@"+p.name.split(" ")[0]+" "}));
+  } else {
+    const q=query.toLowerCase();
+    const allTags=getAllTags();
+    items=allTags.filter(t=>t.toLowerCase().includes(q)).slice(0,7).map(t=>({label:"#"+t,sub:"",insert:"#"+t+" "}));
+    if(query&&!allTags.some(t=>t.toLowerCase()===q)){
+      items.push({label:"#"+query,sub:"nova tag",insert:"#"+query+" "});
+    }
+  }
+  if(!items.length){_sugClose();return;}
+  const box=_sugBox();
+  box.innerHTML=items.map((it,i)=>
+    `<div data-idx="${i}" style="padding:7px 12px;cursor:pointer;font-size:12px;color:#EDEDF0;display:flex;justify-content:space-between;gap:10px;white-space:nowrap" onmousedown="event.preventDefault();_sugSelect(${i})">
+      <span>${it.label}</span>${it.sub?`<span style="color:#55566A;font-size:10px">${it.sub}</span>`:""}
+    </div>`
+  ).join("");
+  _sugState={type,el,triggerStart,items,activeIdx:0};
+  const rect=el.getBoundingClientRect();
+  box.style.left=Math.round(rect.left)+"px";
+  box.style.top=Math.round(rect.bottom+4)+"px";
+  box.style.minWidth=Math.min(320,Math.max(180,rect.width))+"px";
+  box.style.display="block";
+  _sugHighlight();
+}
+function _sugSelect(idx){
+  if(!_sugState)return;
+  const it=_sugState.items[idx];const el=_sugState.el;
+  const val=el.value;const caret=el.selectionStart;
+  const before=val.slice(0,_sugState.triggerStart);const after=val.slice(caret);
+  el.value=before+it.insert+after;
+  const newCaret=(before+it.insert).length;
+  el.focus();el.setSelectionRange(newCaret,newCaret);
+  _sugClose();
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(_sugExcluded(el)){if(_sugState)_sugClose();return;}
+  const val=el.value;const caret=el.selectionStart;
+  let triggerStart=-1,type=null;
+  for(let i=caret-1;i>=0;i--){
+    const ch=val[i];
+    if(ch===" "||ch==="\n"||ch==="\t")break;
+    if(ch==="@"||ch==="#"){
+      const prev=val[i-1];
+      if(i===0||prev===" "||prev==="\n"||prev==="\t"){triggerStart=i;type=ch;}
+      break;
+    }
+  }
+  if(triggerStart<0){_sugClose();return;}
+  const query=val.slice(triggerStart+1,caret);
+  if(/\s/.test(query)){_sugClose();return;}
+  _sugShow(el,type,query,triggerStart);
+});
+document.addEventListener("keydown",e=>{
+  if(!_sugState)return;
+  const box=document.getElementById("sugBox");
+  if(!box||box.style.display==="none")return;
+  if(e.key==="ArrowDown"){e.preventDefault();e.stopPropagation();_sugState.activeIdx=(_sugState.activeIdx+1)%_sugState.items.length;_sugHighlight();}
+  else if(e.key==="ArrowUp"){e.preventDefault();e.stopPropagation();_sugState.activeIdx=(_sugState.activeIdx-1+_sugState.items.length)%_sugState.items.length;_sugHighlight();}
+  else if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();e.stopPropagation();_sugSelect(_sugState.activeIdx);}
+  else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();_sugClose();}
+},true);
+document.addEventListener("click",e=>{
+  if(!e.target.closest||!e.target.closest("#sugBox"))_sugClose();
+});
+document.addEventListener("scroll",()=>{if(_sugState)_sugClose();},true);
 function renderComments(){
   const p=getP(selId);if(!p)return;
   const comments=[...(p.comments||[])].sort((a,b)=>a.ts-b.ts);
@@ -2797,9 +2934,9 @@ function runSearch(q){
   const lq=q.toLowerCase();
   const results={cards:[],tasks:[],meetings:[],systems:[],people:[],templates:[]};
 
-  // CARDS — name, code, notes, desc, blockers
+  // CARDS — name, code, notes, desc, blockers, comments
   projects.filter(p=>!p.archived).forEach(p=>{
-    const hits=[p.name,p.code,p.notes,p.desc,...(p.blockers||[])].some(f=>f&&f.toLowerCase().includes(lq));
+    const hits=[p.name,p.code,p.notes,p.desc,...(p.blockers||[]),...(p.comments||[]).map(c=>c.text)].some(f=>f&&f.toLowerCase().includes(lq));
     if(hits) results.cards.push({id:p.id,title:p.name,sub:p.code+' · '+(p.notes||'').substring(0,60),stage:p.stage});
   });
 
@@ -5184,11 +5321,11 @@ function renderInfo(){
   h+=`<div class="prog-auto-bar"><div class="prog-auto-fill" style="width:${pct}%"></div></div>`;
   h+=`<div class="prog-breakdown"><span>📍 Esteira: ${stageBase}%</span><span>✅ Checklist: +${checkContrib}%</span><span style="color:#D98E3F;font-weight:700">Total: ${pct}%</span></div>`;
   h+=`<span class="slbl">Status Atual</span>`;
-  h+=p.blockers?.length?p.blockers.map(b=>`<div class="blk-item">📌 ${b}</div>`).join(""):`<div style="font-size:11px;color:#55566A;margin-bottom:8px">Nenhuma atualização de status registrada</div>`;
+  h+=p.blockers?.length?p.blockers.map(b=>`<div class="blk-item">📌 ${highlightMentionsAndTags(b)}</div>`).join(""):`<div style="font-size:11px;color:#55566A;margin-bottom:8px">Nenhuma atualização de status registrada</div>`;
   h+=`<button class="btn-s" onclick="editBlk()" style="margin-bottom:16px">Editar status atual</button>`;
-  h+=`<span class="slbl">Notas / Contexto</span><div class="nbox" onclick="editNotes()">${p.notes||"Sem notas — clique para editar"}</div>`;
+  h+=`<span class="slbl">Notas / Contexto</span><div class="nbox" onclick="editNotes()">${p.notes?highlightMentionsAndTags(p.notes):"Sem notas — clique para editar"}</div>`;
   h+=`<span class="slbl" style="display:block;margin:16px 0 6px">Descrição da Demanda</span>`;
-  h+=`<div class="nbox" onclick="editDesc()" style="min-height:60px">${(p.desc||"").replace(/\n/g,"<br>")||"<span style='color:#2C2D3C'>Sem descrição — clique para adicionar</span>"}</div>`;
+  h+=`<div class="nbox" onclick="editDesc()" style="min-height:60px">${p.desc?highlightMentionsAndTags(p.desc).replace(/\n/g,"<br>"):"<span style='color:#2C2D3C'>Sem descrição — clique para adicionar</span>"}</div>`;
   h+=`<span class="slbl" style="display:block;margin:16px 0 6px">Data da RDM</span>`;
   h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
     <input class="rdm-date-inp" type="text" id="rmdInp" value="${p.rmdDate||''}" placeholder="ex: 28/07/2026" onchange="setRmdDate(this.value.trim())">
