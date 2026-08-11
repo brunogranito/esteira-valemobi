@@ -5685,12 +5685,13 @@ function renderReports(){
   <div style="border:1px solid rgba(85,86,106,.25);border-radius:8px;overflow:hidden;margin-bottom:8px">
     ${withStatus.map(p=>{
       const st=STAGES.find(s=>s.id===p.stage);
-      const statusTxt=p.blockers.join(" · ");
-      return`<div style="display:flex;align-items:center;gap:9px;padding:7px 12px;border-left:3px solid ${st?.color||"#D98E3F"};border-bottom:1px solid rgba(85,86,106,.15);cursor:pointer" onclick="closeReportsPanel();openModal('${p.id}')">
-        <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
-        <span style="flex-shrink:0;font-size:12px;font-weight:600;color:#EDEDF0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.name}">${p.name}</span>
-        <span style="flex-shrink:0;font-size:9px;color:#55566A;font-family:monospace;white-space:nowrap">${p.code}</span>
-        <span style="flex:1;min-width:0;font-size:11px;color:#A5A7B8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${statusTxt}">📌 ${statusTxt}</span>
+      return`<div style="padding:7px 12px;border-left:3px solid ${st?.color||"#D98E3F"};border-bottom:1px solid rgba(85,86,106,.15);cursor:pointer" onclick="closeReportsPanel();openModal('${p.id}')">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:3px">
+          <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+          <span style="font-size:12px;font-weight:600;color:#EDEDF0">${p.name}</span>
+          <span style="font-size:9px;color:#55566A;font-family:monospace">${p.code}</span>
+        </div>
+        ${p.blockers.map(b=>`<div style="font-size:11px;color:#A5A7B8;line-height:1.4;padding-left:1px">📌 ${b}</div>`).join("")}
       </div>`;
     }).join("")||'<div style="text-align:center;color:#55566A;padding:20px;font-size:11px">Nenhuma demanda com status atual registrado no momento.</div>'}
   </div>`;
@@ -5804,12 +5805,13 @@ function exportPDF(type){
     <div class="status-list">
     ${withStatus.map(p=>{
       const st=STAGES.find(s=>s.id===p.stage);
-      const statusTxt=p.blockers.join(" · ");
       return`<div class="status-row" style="border-left-color:${st?.color||"#D98E3F"}">
-        <span class="status-chip" style="background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
-        <span class="status-name">${p.name}</span>
-        <span class="status-code">${p.code}</span>
-        <span class="status-txt">📌 ${statusTxt}</span>
+        <div class="status-row-hd">
+          <span class="status-chip" style="background:${st?.color||"#8B8D9B"}20;color:${st?.color||"#8B8D9B"}">${st?.icon||""} ${st?.label||""}</span>
+          <span class="status-name">${p.name}</span>
+          <span class="status-code">${p.code}</span>
+        </div>
+        ${p.blockers.map(b=>`<div class="status-txt">📌 ${b}</div>`).join("")}
       </div>`;
     }).join("")}
     </div>`;
@@ -5845,12 +5847,13 @@ function exportPDF(type){
     .mono{font-family:monospace;font-size:10px;color:#A5A7B8}
     .blk{color:#B5701F;font-weight:600}
     .status-list{border:1px solid #EDEBE3;border-radius:8px;overflow:hidden;margin-bottom:20px}
-    .status-row{display:flex;align-items:center;gap:9px;padding:6px 12px;border-left:3px solid #D98E3F;border-bottom:1px solid #EDEBE3}
+    .status-row{padding:6px 12px;border-left:3px solid #D98E3F;border-bottom:1px solid #EDEBE3}
     .status-row:last-child{border-bottom:none}
+    .status-row-hd{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:3px}
     .status-chip{flex-shrink:0;font-size:8px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap}
-    .status-name{flex-shrink:0;font-size:11px;font-weight:700;color:#14151F;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .status-code{flex-shrink:0;font-size:8px;color:#A5A7B8;font-family:monospace;white-space:nowrap}
-    .status-txt{flex:1;min-width:0;font-size:10px;color:#5A5744;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .status-name{font-size:11px;font-weight:700;color:#14151F}
+    .status-code{font-size:8px;color:#A5A7B8;font-family:monospace}
+    .status-txt{font-size:10px;color:#5A5744;line-height:1.4}
     .bar{display:inline-block;width:70px;height:5px;background:#EDEDF0;border-radius:3px;vertical-align:middle;overflow:hidden}
     .bar-fill{height:100%;background:linear-gradient(90deg,#D98E3F,#B5701F);border-radius:3px}
     .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
