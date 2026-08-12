@@ -3767,20 +3767,28 @@ function dropOnAnyTask(e,toTid,stageId,sectionKey){
       if(idx>=0){taskTx=arr[idx].tx;arr.splice(idx,1);}
       const stageCT=[...((p.customTasks||{})[sId]||[])];
       if(!stageCT.find(t=>t.tid===dragTaskId)){
-        const ctIds=(_sectionTaskIds[sectionKey]||[]);
-        const toIdx=ctIds.indexOf(toTid);
-        stageCT.splice(toIdx<0?stageCT.length:toIdx,0,{tid:dragTaskId,tx:taskTx});
+        stageCT.push({tid:dragTaskId,tx:taskTx});
       }
-      setP(selId,{injectedTasks:injected,customTasks:{...(p.customTasks||{}),[sId]:stageCT}});
+      // Ajusta a ordem visual do pool combinado (pode ter tarefas de vários stages)
+      const poolOrder=[...(p.customPoolOrder||_sectionTaskIds[sectionKey]||[])];
+      const cleaned=poolOrder.filter(id=>id!==dragTaskId);
+      const toIdx=cleaned.indexOf(toTid);
+      cleaned.splice(toIdx<0?cleaned.length:toIdx,0,dragTaskId);
+      setP(selId,{injectedTasks:injected,customTasks:{...(p.customTasks||{}),[sId]:stageCT},customPoolOrder:cleaned});
       renderCheck();return;
     }
     if(isFromCustom){
-      const ct=JSON.parse(JSON.stringify((p.customTasks||{})[sId]||[]));
-      const fi=ct.findIndex(t=>t.tid===dragTaskId);
-      const ti=ct.findIndex(t=>t.tid===toTid);
+      // A área "Tarefas adicionadas" mistura tarefas guardadas em stages DIFERENTES
+      // (ex: uma customTasks.qa e outra customTasks.dev, exibidas juntas). Por isso a
+      // ordem NÃO pode vir do array de um único stage — usa uma ordem própria do pool,
+      // combinando tarefas de todos os stages (era aqui que a reordenação travava
+      // silenciosamente quando origem e destino estavam em stages diferentes).
+      const poolOrder=[...(p.customPoolOrder||_sectionTaskIds[sectionKey]||[])];
+      const fi=poolOrder.indexOf(dragTaskId);
+      const ti=poolOrder.indexOf(toTid);
       if(fi<0||ti<0)return;
-      ct.splice(ti,0,ct.splice(fi,1)[0]);
-      setP(selId,{customTasks:{...(p.customTasks||{}),[sId]:ct}});
+      poolOrder.splice(ti,0,poolOrder.splice(fi,1)[0]);
+      setP(selId,{customPoolOrder:poolOrder});
       renderCheck();return;
     }
     return; // tarefa padrão/permanente não pode ir pra área custom
@@ -5581,7 +5589,15 @@ function renderCheck(){
   );
 
   if(customByStage.length||permanentCustom.length){
-    const allCustom=[...customByStage,...permanentCustom.map(t=>({tid:t.tid,tx:t.tx,isPermanent:true}))];
+    let allCustom=[...customByStage,...permanentCustom.map(t=>({tid:t.tid,tx:t.tx,isPermanent:true}))];
+    if(p.customPoolOrder?.length){
+      const orderIdx=new Map(p.customPoolOrder.map((tid,i)=>[tid,i]));
+      allCustom=[...allCustom].sort((a,b)=>{
+        const ai=orderIdx.has(a.tid)?orderIdx.get(a.tid):Infinity;
+        const bi=orderIdx.has(b.tid)?orderIdx.get(b.tid):Infinity;
+        return ai-bi;
+      });
+    }
     const notDisC=allCustom.filter(t=>!(p.dis||{})[t.tid||t.id]);
     const doneC=notDisC.filter(t=>(p.checks||{})[(t.tid||t.id)]).length;
     h+=`<div class="cl-sec"><div class="cl-sec-hd"><span>➕ Tarefas adicionadas</span><div style="display:flex;align-items:center;gap:7px"><span class="cl-sec-pct">${doneC}/${notDisC.length}</span></div></div>`;
