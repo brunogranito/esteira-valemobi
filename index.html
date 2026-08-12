@@ -6086,6 +6086,8 @@ function exportPDF(type){
   const active=projects.filter(p=>!p.archived);
   const byStage=(arr)=>[...arr].sort((a,b)=>{const si=i=>STAGES.findIndex(s=>s.id===i);return si(b.stage)-si(a.stage)||b.progress-a.progress;});
   const now=new Date().toLocaleString("pt-BR");
+  const issuerName=currentUser?.name||"Usuário não identificado";
+  const issuerRole=getPeople().find(pp=>pp.name===issuerName)?.role||"";
   const titles={geral:"Resumo Geral",stage:"Demandas por Stage",andamento:"Andamento por Demanda",checklist:"Checklist por Demanda",status:"Status Atual — Card por Card",semanal:"Relatório Semanal"};
   let content="";
 
@@ -6144,6 +6146,24 @@ function exportPDF(type){
       content+=`<tr class="${p.progress>=100?"done":""}"><td><strong>${p.name}</strong></td><td>${STAGES.find(s=>s.id===p.stage)?.label||""}</td><td>${done}/${enabled.length}</td><td class="${(enabled.length-done)>0?"blk":""}">${(enabled.length-done)||"—"}</td><td><div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div> ${pct}%</td><td>${p.progress}%</td></tr>`;
     });
     content+=`</tbody></table>`;
+  } else if(type==="semanal"){
+    const weekAgo=new Date(Date.now()-7*86400000);
+    const changed=active.filter(p=>(p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo));
+    const mtgs=active.flatMap(p=>(p.meetings||[]).filter(m=>new Date(m.date+'T12:00')>=weekAgo).map(m=>({...m,pname:p.name})));
+    content=`<h3 style="color:#B5701F;border-color:#B5701F">📅 Semana de ${weekAgo.toLocaleDateString('pt-BR')} a ${new Date().toLocaleDateString('pt-BR')}</h3>
+      <div class="summary-grid">
+        <div class="s-card"><div class="s-num">${active.length}</div><div class="s-lbl">Demandas ativas</div></div>
+        <div class="s-card green"><div class="s-num">${changed.length}</div><div class="s-lbl">Movimentadas</div></div>
+        <div class="s-card blue" style="border-color:#bfdbfe;background:#eff6ff"><div class="s-num" style="color:#1d4ed8">${mtgs.length}</div><div class="s-lbl">Reuniões</div></div>
+      </div>
+      <h3 style="color:#B5701F;border-color:#B5701F">Movimentações</h3>
+      <table><thead><tr><th>Demanda</th><th>Código</th><th>Stage atual</th><th>Progresso</th></tr></thead><tbody>
+      ${changed.map(p=>{const st=STAGES.find(s=>s.id===p.stage);return`<tr><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${st?.label||p.stage}</td><td>${p.progress}%</td></tr>`;}).join('')}
+      </tbody></table>
+      ${mtgs.length?`<h3 style="color:#B5701F;border-color:#B5701F">Reuniões da Semana</h3>
+      <table><thead><tr><th>Data</th><th>Demanda</th><th>Participantes</th><th>Decisões</th></tr></thead><tbody>
+      ${mtgs.map(m=>`<tr><td>${new Date(m.date+'T12:00').toLocaleDateString('pt-BR')}</td><td>${m.pname}</td><td>${m.participants||'-'}</td><td>${m.decisions||'-'}</td></tr>`).join('')}
+      </tbody></table>`:''}`;
   }
 
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — ${titles[type]} — ${fileTimestamp()}</title>
@@ -6481,37 +6501,17 @@ body.light .paci-name{color:#1C1D28}
 </style></head><body>
   <div class="cover">
     <div class="cover-logo">⚡ Esteira Valemobi — RV</div>
-    <div class="cover-subtitle">Sistema de Gestão de Demandas • Analista de Negócios RV</div>
+    <div class="cover-subtitle">Sistema de Gestão de Demandas • Emitido por ${issuerName}${issuerRole?" — "+issuerRole:""}</div>
     <div class="cover-title">${titles[type]}</div>
     <div class="cover-meta">Gerado em ${now} • ${active.length} demandas ativas</div>
   </div>
   <div class="body">${content}</div>
-  <div class="footer"><span>Esteira Valemobi RV — Confidencial</span><span>${now}</span></div>
+  <div class="footer"><span>Esteira Valemobi RV — Confidencial · Emitido por ${issuerName}</span><span>${now}</span></div>
   <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`;
 
   const w=window.open("","_blank","width=900,height=700");
   if(w){w.document.write(html);w.document.close();}
-  else if(type==="semanal"){
-    const weekAgo=new Date(Date.now()-7*86400000);
-    const changed=active.filter(p=>(p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo));
-    const mtgs=active.flatMap(p=>(p.meetings||[]).filter(m=>new Date(m.date+'T12:00')>=weekAgo).map(m=>({...m,pname:p.name})));
-    content=`<h3 style="color:#B5701F;border-color:#B5701F">📅 Semana de ${weekAgo.toLocaleDateString('pt-BR')} a ${new Date().toLocaleDateString('pt-BR')}</h3>
-      <div class="summary-grid">
-        <div class="s-card"><div class="s-num">${active.length}</div><div class="s-lbl">Demandas ativas</div></div>
-        <div class="s-card green"><div class="s-num">${changed.length}</div><div class="s-lbl">Movimentadas</div></div>
-        <div class="s-card blue" style="border-color:#bfdbfe;background:#eff6ff"><div class="s-num" style="color:#1d4ed8">${mtgs.length}</div><div class="s-lbl">Reuniões</div></div>
-      </div>
-      <h3 style="color:#B5701F;border-color:#B5701F">Movimentações</h3>
-      <table><thead><tr><th>Demanda</th><th>Código</th><th>Stage atual</th><th>Progresso</th></tr></thead><tbody>
-      ${changed.map(p=>{const st=STAGES.find(s=>s.id===p.stage);return`<tr><td><strong>${p.name}</strong></td><td class="mono">${p.code}</td><td>${st?.label||p.stage}</td><td>${p.progress}%</td></tr>`;}).join('')}
-      </tbody></table>
-      ${mtgs.length?`<h3 style="color:#B5701F;border-color:#B5701F">Reuniões da Semana</h3>
-      <table><thead><tr><th>Data</th><th>Demanda</th><th>Participantes</th><th>Decisões</th></tr></thead><tbody>
-      ${mtgs.map(m=>`<tr><td>${new Date(m.date+'T12:00').toLocaleDateString('pt-BR')}</td><td>${m.pname}</td><td>${m.participants||'-'}</td><td>${m.decisions||'-'}</td></tr>`).join('')}
-      </tbody></table>`:''}`;
-  }
-
   else showToast("Bloqueio de pop-up","Permita pop-ups neste site para exportar PDF.");
 }
 
