@@ -6165,7 +6165,7 @@ function exportPDF(type){
     .mono{font-family:monospace;font-size:10px;color:#A5A7B8}
     .blk{color:#B5701F;font-weight:600}
     .status-list{border:1px solid #EDEBE3;border-radius:8px;overflow:hidden;margin-bottom:20px}
-    .status-row{padding:6px 12px;border-left:3px solid #D98E3F;border-bottom:1px solid #EDEBE3}
+    .status-row{padding:6px 12px;border-left:3px solid #D98E3F;border-bottom:1px solid #EDEBE3;break-inside:avoid;page-break-inside:avoid}
     .status-row:last-child{border-bottom:none}
     .status-row-hd{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:3px}
     .status-chip{flex-shrink:0;font-size:8px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap}
@@ -6175,7 +6175,7 @@ function exportPDF(type){
     .bar{display:inline-block;width:70px;height:5px;background:#EDEDF0;border-radius:3px;vertical-align:middle;overflow:hidden}
     .bar-fill{height:100%;background:linear-gradient(90deg,#D98E3F,#B5701F);border-radius:3px}
     .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
-    .s-card{background:#F5F3EE;border:1px solid #EDEDF0;border-radius:10px;padding:16px;text-align:center}
+    .s-card{background:#F5F3EE;border:1px solid #EDEDF0;border-radius:10px;padding:16px;text-align:center;break-inside:avoid;page-break-inside:avoid}
     .s-card.green{border-color:#bbf7d0;background:#f0fdf4}
     .s-card.red{border-color:#fecaca;background:#fff5f5}
     .s-card.orange{border-color:#fed7aa;background:#fff7ed}
@@ -6196,7 +6196,10 @@ function exportPDF(type){
       .body{padding:24px 36px}
       .footer{padding:12px 36px}
       table{page-break-inside:auto}
-      tr{page-break-inside:avoid}
+      tr{page-break-inside:avoid;break-inside:avoid}
+      .status-row{page-break-inside:avoid;break-inside:avoid}
+      .s-card{page-break-inside:avoid;break-inside:avoid}
+      .stage-block{page-break-inside:avoid;break-inside:avoid}
     }
   
 /* ── LIGHT THEME ────────────────────────────────── */
