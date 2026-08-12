@@ -2368,12 +2368,16 @@ document.addEventListener("input",e=>{
   if(_sugExcluded(el)){if(_sugState)_sugClose();return;}
   const val=el.value;const caret=el.selectionStart;
   let triggerStart=-1,type=null;
+  const isWordChar=c=>c!==undefined&&/[\wÀ-ÿ]/.test(c);
   for(let i=caret-1;i>=0;i--){
     const ch=val[i];
     if(ch===" "||ch==="\n"||ch==="\t")break;
     if(ch==="@"||ch==="#"){
       const prev=val[i-1];
-      if(i===0||prev===" "||prev==="\n"||prev==="\t"){triggerStart=i;type=ch;}
+      // Só NÃO é início válido de menção se vier logo depois de uma letra/número
+      // (esse é o caso real de e-mail, ex: nome@dominio). Qualquer pontuação
+      // (parênteses, vírgula, aspas, etc.) antes do @/# é um início válido.
+      if(i===0||!isWordChar(prev)){triggerStart=i;type=ch;}
       break;
     }
   }
