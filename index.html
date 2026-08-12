@@ -3035,6 +3035,26 @@ function openTplModal(i){
 
 /* ── GLOBAL SEARCH ───────────────────────────────────── */
 let searchTimeout=null;
+let reportsFilter="";
+// Checagem de match usada tanto pelos relatórios em tela quanto no PDF exportado —
+// cobre palavra livre, @pessoa e #tag, já que essas aparecem como texto normal
+function matchesReportFilter(p,q){
+  if(!q)return true;
+  const lq=q.toLowerCase();
+  const st=STAGES.find(s=>s.id===p.stage);
+  const prio=PRIO[p.priority];
+  const hay=[
+    p.name,p.code,p.notes,p.desc,p.owner,p.dev,p.qa,
+    st?.label,prio?.label,
+    ...(p.blockers||[]),
+    ...(p.comments||[]).map(c=>c.text),
+  ].filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(lq);
+}
+function setReportsFilter(v){
+  reportsFilter=v;
+  renderReports();
+}
 function globalSearch(q){
   q=(q||'').trim();
   if(searchTimeout) clearTimeout(searchTimeout);
@@ -5934,11 +5954,15 @@ function openReportsPanel(){document.getElementById("rptOverlay").classList.add(
 function closeReportsPanel(){document.getElementById("rptOverlay").classList.remove("open");}
 
 function renderReports(){
+  const filterInput=document.getElementById("rptFilterInp");
+  const hadFocus=document.activeElement===filterInput;
+  const caretPos=hadFocus?filterInput.selectionStart:null;
   const body=document.getElementById("rptBody");
-  const active=projects.filter(p=>!p.archived);
+  let active=projects.filter(p=>!p.archived);
+  if(reportsFilter)active=active.filter(p=>matchesReportFilter(p,reportsFilter));
   const byPrio={urgent:0,high:0,normal:0,low:0};
   active.forEach(p=>{if(byPrio[p.priority]!==undefined)byPrio[p.priority]++;});
-  const concluidos=projects.filter(p=>p.progress>=100).length; // inclui arquivados
+  const concluidos=(reportsFilter?active:projects).filter(p=>p.progress>=100).length; // inclui arquivados quando sem filtro
 
   // helper: sort by stage index then progress desc
   const byStage=(arr)=>[...arr].sort((a,b)=>{
@@ -5946,7 +5970,12 @@ function renderReports(){
     return si(b.stage)-si(a.stage)||b.progress-a.progress;
   });
 
-  let h=`<div class="rpt-section-title">📊 Resumo Geral
+  let h=`<div style="margin-bottom:16px">
+    <input id="rptFilterInp" class="mef-inp no-suggest" placeholder="🔎 Filtrar todos os relatórios por palavra, @pessoa ou #tag…"
+      value="${(reportsFilter||"").replace(/"/g,"&quot;")}" oninput="setReportsFilter(this.value)" style="width:100%;box-sizing:border-box">
+    ${reportsFilter?`<div style="font-size:10px;color:#8B8D9B;margin-top:6px">Filtro ativo: <strong style="color:#E2A968">"${reportsFilter}"</strong> — ${active.length} demanda(s) encontrada(s) · aplica-se também aos PDFs exportados <button onclick="setReportsFilter('')" style="background:none;border:none;color:#8B8D9B;text-decoration:underline;cursor:pointer;font-size:10px;margin-left:4px">limpar</button></div>`:""}
+  </div>
+  <div class="rpt-section-title">📊 Resumo Geral
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('geral')">⬇ PDF</button>
   </div>
   <div class="rpt-cards">
@@ -6079,11 +6108,16 @@ function renderReports(){
     h+=`</tbody></table>`;
   }
   body.innerHTML=h;
+  if(hadFocus){
+    const newInput=document.getElementById("rptFilterInp");
+    if(newInput){newInput.focus();newInput.setSelectionRange(caretPos,caretPos);}
+  }
 }
 
 /* ── PDF EXPORT ─────────────────────────────────────── */
 function exportPDF(type){
-  const active=projects.filter(p=>!p.archived);
+  let active=projects.filter(p=>!p.archived);
+  if(reportsFilter)active=active.filter(p=>matchesReportFilter(p,reportsFilter));
   const byStage=(arr)=>[...arr].sort((a,b)=>{const si=i=>STAGES.findIndex(s=>s.id===i);return si(b.stage)-si(a.stage)||b.progress-a.progress;});
   const now=new Date().toLocaleString("pt-BR");
   const issuerName=currentUser?.name||"Usuário não identificado";
@@ -6503,7 +6537,7 @@ body.light .paci-name{color:#1C1D28}
     <div class="cover-logo">⚡ Esteira Valemobi — RV</div>
     <div class="cover-subtitle">Sistema de Gestão de Demandas • Emitido por ${issuerName}${issuerRole?" — "+issuerRole:""}</div>
     <div class="cover-title">${titles[type]}</div>
-    <div class="cover-meta">Gerado em ${now} • ${active.length} demandas ativas</div>
+    <div class="cover-meta">Gerado em ${now} • ${active.length} demandas ativas${reportsFilter?` • Filtro: "${reportsFilter}"`:""}</div>
   </div>
   <div class="body">${content}</div>
   <div class="footer"><span>Esteira Valemobi RV — Confidencial · Emitido por ${issuerName}</span><span>${now}</span></div>
