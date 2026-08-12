@@ -2328,6 +2328,9 @@ function _sugShow(el,type,query,triggerStart){
     const q=query.toLowerCase();
     items=getPeople().filter(p=>p.name.toLowerCase().includes(q)).slice(0,8)
       .map(p=>({label:"@"+p.name,sub:p.role||"",insert:"@"+p.name+" "}));
+    if(query&&!getPeople().some(p=>p.name.toLowerCase()===q)){
+      items.push({label:"@"+query,sub:"+ cadastrar pessoa",isNewPerson:true,newPersonName:query});
+    }
   } else {
     const q=query.toLowerCase();
     const allTags=getAllTags();
@@ -2354,6 +2357,12 @@ function _sugShow(el,type,query,triggerStart){
 function _sugSelect(idx){
   if(!_sugState)return;
   const it=_sugState.items[idx];const el=_sugState.el;
+  if(it.isNewPerson){
+    const triggerStart=_sugState.triggerStart,caret=el.selectionStart;
+    _sugClose();
+    _openNewPersonModal(it.newPersonName,el,triggerStart,caret);
+    return;
+  }
   const val=el.value;const caret=el.selectionStart;
   const before=val.slice(0,_sugState.triggerStart);const after=val.slice(caret);
   el.value=before+it.insert+after;
@@ -2361,6 +2370,62 @@ function _sugSelect(idx){
   el.focus();el.setSelectionRange(newCaret,newCaret);
   _sugClose();
   el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+
+/* ── Cadastro rápido de pessoa nova a partir de uma @menção ── */
+let _pendingMention=null;
+function _openNewPersonModal(name,el,triggerStart,caret){
+  _pendingMention={el,triggerStart,caret};
+  let modal=document.getElementById("newPersonModal");
+  if(!modal){
+    modal=document.createElement("div");
+    modal.id="newPersonModal";
+    modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px";
+    document.body.appendChild(modal);
+  }
+  const cap=name.charAt(0).toUpperCase()+name.slice(1);
+  modal.innerHTML=`<div style="background:#1C1D28;border:1px solid rgba(85,86,106,.3);border-radius:12px;padding:22px;width:min(380px,100%);box-shadow:0 12px 32px rgba(0,0,0,.7)">
+    <div style="font-size:14px;font-weight:700;color:#EDEDF0;margin-bottom:14px">✨ Cadastrar nova pessoa</div>
+    <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Nome completo</label>
+    <input id="npName" class="mef-inp" value="${cap.replace(/"/g,"&quot;")}" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+    <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Cargo</label>
+    <input id="npRole" class="mef-inp" placeholder="Ex: Analista de Negócios" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+    <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Organização</label>
+    <select id="npOrg" class="mef-inp" style="width:100%;margin-bottom:16px;box-sizing:border-box">
+      <option value="vm">Valemobi</option><option value="ag">Ágora</option><option value="br">Bradesco</option>
+    </select>
+    <div style="display:flex;gap:8px">
+      <button onclick="_confirmNewPerson()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Cadastrar e mencionar</button>
+      <button onclick="_closeNewPersonModal()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.3);color:#8B8D9B;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  modal.style.display="flex";
+  setTimeout(()=>{document.getElementById("npName")?.focus();document.getElementById("npName")?.select();},50);
+}
+function _closeNewPersonModal(){
+  const modal=document.getElementById("newPersonModal");
+  if(modal)modal.style.display="none";
+  _pendingMention=null;
+}
+async function _confirmNewPerson(){
+  const name=(document.getElementById("npName")?.value||"").trim();
+  const role=(document.getElementById("npRole")?.value||"").trim();
+  const org=document.getElementById("npOrg")?.value||"vm";
+  if(!name){showToast("Nome obrigatório","");return;}
+  const list=[...getPeople(),{org,name,role,color:"#0284c7"}];
+  await saveMenuData("people",list);
+  if(_pendingMention){
+    const{el,triggerStart,caret}=_pendingMention;
+    const val=el.value;
+    const before=val.slice(0,triggerStart);const after=val.slice(caret);
+    const insert="@"+name+" ";
+    el.value=before+insert+after;
+    const newCaret=(before+insert).length;
+    el.focus();el.setSelectionRange(newCaret,newCaret);
+    el.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  _closeNewPersonModal();
+  showToast("✅ Pessoa cadastrada",name);
 }
 
 document.addEventListener("input",e=>{
