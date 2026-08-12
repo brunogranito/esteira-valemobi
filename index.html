@@ -3035,7 +3035,7 @@ function openTplModal(i){
 
 /* ── GLOBAL SEARCH ───────────────────────────────────── */
 let searchTimeout=null;
-let reportsFilter="";
+let reportFilters={geral:"",stage:"",andamento:"",status:"",checklist:"",semanal:""};
 // Checagem de match usada tanto pelos relatórios em tela quanto no PDF exportado —
 // cobre palavra livre, @pessoa e #tag, já que essas aparecem como texto normal
 function matchesReportFilter(p,q){
@@ -3051,9 +3051,17 @@ function matchesReportFilter(p,q){
   ].filter(Boolean).join(" ").toLowerCase();
   return hay.includes(lq);
 }
-function setReportsFilter(v){
-  reportsFilter=v;
+function setReportFilter(type,v){
+  reportFilters[type]=v;
   renderReports();
+}
+function filterBoxHtml(type,label){
+  const val=reportFilters[type]||"";
+  return`<div style="margin:2px 0 12px">
+    <input id="rptFilterInp-${type}" class="mef-inp no-suggest" placeholder="🔎 Filtrar ${label} — palavra, @pessoa ou #tag…"
+      value="${val.replace(/"/g,"&quot;")}" oninput="setReportFilter('${type}',this.value)" style="width:100%;box-sizing:border-box;font-size:11px;padding:6px 10px">
+    ${val?`<div style="font-size:9px;color:#8B8D9B;margin-top:4px">Filtro: <strong style="color:#E2A968">"${val}"</strong> · aplica-se também ao PDF <button onclick="setReportFilter('${type}','')" style="background:none;border:none;color:#8B8D9B;text-decoration:underline;cursor:pointer;font-size:9px;margin-left:4px">limpar</button></div>`:""}
+  </div>`;
 }
 function globalSearch(q){
   q=(q||'').trim();
@@ -5954,15 +5962,16 @@ function openReportsPanel(){document.getElementById("rptOverlay").classList.add(
 function closeReportsPanel(){document.getElementById("rptOverlay").classList.remove("open");}
 
 function renderReports(){
-  const filterInput=document.getElementById("rptFilterInp");
-  const hadFocus=document.activeElement===filterInput;
-  const caretPos=hadFocus?filterInput.selectionStart:null;
+  // Preserva foco/cursor do campo de filtro que estava sendo usado, entre as várias seções
+  const activeEl=document.activeElement;
+  const hadFocusId=activeEl&&activeEl.id&&activeEl.id.startsWith("rptFilterInp-")?activeEl.id:null;
+  const caretPos=hadFocusId?activeEl.selectionStart:null;
+
   const body=document.getElementById("rptBody");
-  let active=projects.filter(p=>!p.archived);
-  if(reportsFilter)active=active.filter(p=>matchesReportFilter(p,reportsFilter));
+  const allActive=projects.filter(p=>!p.archived);
   const byPrio={urgent:0,high:0,normal:0,low:0};
-  active.forEach(p=>{if(byPrio[p.priority]!==undefined)byPrio[p.priority]++;});
-  const concluidos=(reportsFilter?active:projects).filter(p=>p.progress>=100).length; // inclui arquivados quando sem filtro
+  allActive.forEach(p=>{if(byPrio[p.priority]!==undefined)byPrio[p.priority]++;});
+  const concluidos=projects.filter(p=>p.progress>=100).length; // inclui arquivados
 
   // helper: sort by stage index then progress desc
   const byStage=(arr)=>[...arr].sort((a,b)=>{
@@ -5970,29 +5979,31 @@ function renderReports(){
     return si(b.stage)-si(a.stage)||b.progress-a.progress;
   });
 
-  let h=`<div style="margin-bottom:16px">
-    <input id="rptFilterInp" class="mef-inp no-suggest" placeholder="🔎 Filtrar todos os relatórios por palavra, @pessoa ou #tag…"
-      value="${(reportsFilter||"").replace(/"/g,"&quot;")}" oninput="setReportsFilter(this.value)" style="width:100%;box-sizing:border-box">
-    ${reportsFilter?`<div style="font-size:10px;color:#8B8D9B;margin-top:6px">Filtro ativo: <strong style="color:#E2A968">"${reportsFilter}"</strong> — ${active.length} demanda(s) encontrada(s) · aplica-se também aos PDFs exportados <button onclick="setReportsFilter('')" style="background:none;border:none;color:#8B8D9B;text-decoration:underline;cursor:pointer;font-size:10px;margin-left:4px">limpar</button></div>`:""}
-  </div>
-  <div class="rpt-section-title">📊 Resumo Geral
+  // ── Resumo Geral ──
+  const activeGeral=reportFilters.geral?allActive.filter(p=>matchesReportFilter(p,reportFilters.geral)):allActive;
+  const byPrioG={urgent:0,high:0,normal:0,low:0};
+  activeGeral.forEach(p=>{if(byPrioG[p.priority]!==undefined)byPrioG[p.priority]++;});
+  let h=`<div class="rpt-section-title">📊 Resumo Geral
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('geral')">⬇ PDF</button>
   </div>
+  ${filterBoxHtml("geral","o resumo geral")}
   <div class="rpt-cards">
-    <div class="rpt-card"><div class="rpt-num" style="color:#D98E3F">${active.length}</div><div class="rpt-lbl">Demandas ativas</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#7A9B6B">${concluidos}</div><div class="rpt-lbl">✅ Concluídas</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#f87171">${byPrio.urgent}</div><div class="rpt-lbl">🔴 Urgentes</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#fb923c">${byPrio.high}</div><div class="rpt-lbl">🟠 Alta</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#fbbf24">${active.filter(p=>p.blockers?.length>0).length}</div><div class="rpt-lbl">📌 Com Status Atual</div></div>
-    <div class="rpt-card"><div class="rpt-num" style="color:#8b5cf6">${active.filter(p=>p.stage==="rdm").length}</div><div class="rpt-lbl">🚀 Em RDM</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#D98E3F">${activeGeral.length}</div><div class="rpt-lbl">Demandas ativas</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#7A9B6B">${reportFilters.geral?activeGeral.filter(p=>p.progress>=100).length:concluidos}</div><div class="rpt-lbl">✅ Concluídas</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#f87171">${byPrioG.urgent}</div><div class="rpt-lbl">🔴 Urgentes</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#fb923c">${byPrioG.high}</div><div class="rpt-lbl">🟠 Alta</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#fbbf24">${activeGeral.filter(p=>p.blockers?.length>0).length}</div><div class="rpt-lbl">📌 Com Status Atual</div></div>
+    <div class="rpt-card"><div class="rpt-num" style="color:#8b5cf6">${activeGeral.filter(p=>p.stage==="rdm").length}</div><div class="rpt-lbl">🚀 Em RDM</div></div>
   </div>`;
 
-  // Por stage — pills coloridas
+  // ── Por Stage ──
+  const activeStageF=reportFilters.stage?allActive.filter(p=>matchesReportFilter(p,reportFilters.stage)):allActive;
   h+=`<div class="rpt-section-title" style="margin-top:8px">📍 Por Stage
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('stage')">⬇ PDF</button>
-  </div>`;
+  </div>
+  ${filterBoxHtml("stage","por stage")}`;
   STAGES.forEach(s=>{
-    const ps=active.filter(p=>p.stage===s.id);
+    const ps=activeStageF.filter(p=>p.stage===s.id);
     if(!ps.length)return;
     h+=`<div style="margin-bottom:12px">
       <div style="font-size:10px;font-weight:700;color:${s.color};margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">${s.icon} ${s.label} <span style="background:${s.color}20;padding:1px 7px;border-radius:10px;font-size:10px">${ps.length}</span></div>
@@ -6001,13 +6012,16 @@ function renderReports(){
       </div>
     </div>`;
   });
+  if(!activeStageF.length)h+=`<div style="font-size:11px;color:#55566A;text-align:center;padding:14px 0">Nenhuma demanda encontrada.</div>`;
 
-  // Andamento — sorted by stage progress
+  // ── Andamento por Demanda ──
+  const activeAnd=reportFilters.andamento?allActive.filter(p=>matchesReportFilter(p,reportFilters.andamento)):allActive;
   h+=`<div class="rpt-section-title">📈 Andamento por Demanda
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('andamento')">⬇ PDF</button>
   </div>
+  ${filterBoxHtml("andamento","o andamento")}
   <table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Stage</th><th>Prioridade</th><th>Progresso</th><th>Status Atual</th></tr></thead><tbody>`;
-  byStage(active).forEach(p=>{
+  byStage(activeAnd).forEach(p=>{
     const st=STAGES.find(s=>s.id===p.stage);
     const prioK=p.priority;
     const prioHtml=prioK&&prioK!=="normal"?`<span class="prio-badge ${prioK}">${PRIO[prioK]?.label}</span>`:`<span style="font-size:10px;color:#2C2D3C">—</span>`;
@@ -6023,12 +6037,14 @@ function renderReports(){
   });
   h+=`</tbody></table>`;
 
-  // Status Atual — visão dedicada, card por card
-  const withStatus=byStage(active).filter(p=>p.blockers?.length>0);
+  // ── Status Atual — visão dedicada, card por card ──
+  const activeStatusF=reportFilters.status?allActive.filter(p=>matchesReportFilter(p,reportFilters.status)):allActive;
+  const withStatus=byStage(activeStatusF).filter(p=>p.blockers?.length>0);
   h+=`<div class="rpt-section-title">📌 Status Atual — Card por Card
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('status')">⬇ PDF</button>
   </div>
-  <div style="font-size:11px;color:#8B8D9B;margin-bottom:10px">${withStatus.length} de ${active.length} demandas ativas com status atual registrado</div>
+  ${filterBoxHtml("status","o status atual")}
+  <div style="font-size:11px;color:#8B8D9B;margin-bottom:10px">${withStatus.length} de ${activeStatusF.length} demandas ativas com status atual registrado</div>
   <div style="border:1px solid rgba(85,86,106,.25);border-radius:8px;overflow:hidden;margin-bottom:8px">
     ${withStatus.map(p=>{
       const st=STAGES.find(s=>s.id===p.stage);
@@ -6043,12 +6059,14 @@ function renderReports(){
     }).join("")||'<div style="text-align:center;color:#55566A;padding:20px;font-size:11px">Nenhuma demanda com status atual registrado no momento.</div>'}
   </div>`;
 
-  // Checklist — same stage ordering
+  // ── Checklist por Demanda ──
+  const activeChk=reportFilters.checklist?allActive.filter(p=>matchesReportFilter(p,reportFilters.checklist)):allActive;
   h+=`<div class="rpt-section-title">☑️ Checklist por Demanda
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('checklist')">⬇ PDF</button>
   </div>
+  ${filterBoxHtml("checklist","o checklist")}
   <table class="rpt-tbl"><thead><tr><th>Demanda</th><th>Stage</th><th>Concluídas</th><th>Pendentes</th><th>%</th></tr></thead><tbody>`;
-  byStage(active).forEach(p=>{
+  byStage(activeChk).forEach(p=>{
     const clS=CL[p.stage]||[];
     const all=[...clS.flatMap(s=>s.t),...((p.customTasks||{})[p.stage]||[])];
     const enabled=all.filter(t=>!(p.dis||{})[t.id||t.tid]);
@@ -6067,15 +6085,17 @@ function renderReports(){
   h+=`</tbody></table>`;
 
   const rem=[];const now=new Date();
-  active.forEach(p=>{Object.entries(p.taskDates||{}).forEach(([tid,dt])=>{if(!dt)return;const d=new Date(dt);rem.push({pname:p.name,pid:p.id,text:findTaskText(p,tid),d,past:d<=now});});
+  allActive.forEach(p=>{Object.entries(p.taskDates||{}).forEach(([tid,dt])=>{if(!dt)return;const d=new Date(dt);rem.push({pname:p.name,pid:p.id,text:findTaskText(p,tid),d,past:d<=now});});
     if(p.cardReminder){const d=new Date(p.cardReminder);rem.push({pname:p.name+" (card)",pid:p.id,text:"Lembrete geral do card",d,past:d<=now});}
   });
-  // RELATÓRIO SEMANAL — sempre exibido
+  // ── RELATÓRIO SEMANAL — sempre exibido ──
+  const activeSem=reportFilters.semanal?allActive.filter(p=>matchesReportFilter(p,reportFilters.semanal)):allActive;
   const weekAgo=new Date(Date.now()-7*86400000);
-  const changedThisWeek=active.filter(p=>(p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo));
+  const changedThisWeek=activeSem.filter(p=>(p.stageHistory||[]).some(h=>new Date(h.enteredAt)>=weekAgo));
   h+=`<div class="rpt-section-title">📅 Movimentações desta semana
     <button class="rpt-btn" style="float:right;font-size:10px" onclick="exportPDF('semanal')">⬇ PDF Semanal</button>
-  </div>`;
+  </div>
+  ${filterBoxHtml("semanal","as movimentações")}`;
   if(!changedThisWeek.length){
     h+=`<div style="font-size:11px;color:#55566A;padding:12px 0;text-align:center">
       Nenhuma movimentação registrada esta semana.<br>
@@ -6108,8 +6128,8 @@ function renderReports(){
     h+=`</tbody></table>`;
   }
   body.innerHTML=h;
-  if(hadFocus){
-    const newInput=document.getElementById("rptFilterInp");
+  if(hadFocusId){
+    const newInput=document.getElementById(hadFocusId);
     if(newInput){newInput.focus();newInput.setSelectionRange(caretPos,caretPos);}
   }
 }
@@ -6117,7 +6137,8 @@ function renderReports(){
 /* ── PDF EXPORT ─────────────────────────────────────── */
 function exportPDF(type){
   let active=projects.filter(p=>!p.archived);
-  if(reportsFilter)active=active.filter(p=>matchesReportFilter(p,reportsFilter));
+  const activeFilter=reportFilters[type]||"";
+  if(activeFilter)active=active.filter(p=>matchesReportFilter(p,activeFilter));
   const byStage=(arr)=>[...arr].sort((a,b)=>{const si=i=>STAGES.findIndex(s=>s.id===i);return si(b.stage)-si(a.stage)||b.progress-a.progress;});
   const now=new Date().toLocaleString("pt-BR");
   const issuerName=currentUser?.name||"Usuário não identificado";
@@ -6537,7 +6558,7 @@ body.light .paci-name{color:#1C1D28}
     <div class="cover-logo">⚡ Esteira Valemobi — RV</div>
     <div class="cover-subtitle">Sistema de Gestão de Demandas • Emitido por ${issuerName}${issuerRole?" — "+issuerRole:""}</div>
     <div class="cover-title">${titles[type]}</div>
-    <div class="cover-meta">Gerado em ${now} • ${active.length} demandas ativas${reportsFilter?` • Filtro: "${reportsFilter}"`:""}</div>
+    <div class="cover-meta">Gerado em ${now} • ${active.length} demandas ativas${activeFilter?` • Filtro: "${activeFilter}"`:""}</div>
   </div>
   <div class="body">${content}</div>
   <div class="footer"><span>Esteira Valemobi RV — Confidencial · Emitido por ${issuerName}</span><span>${now}</span></div>
