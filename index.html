@@ -269,6 +269,15 @@ textarea.ea{width:100%;background:rgba(20,21,31,.8);border:1px solid #D98E3F;col
 /* ── MENU & REPORTS ─────────────────────────────────── */
 .panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:none;align-items:flex-start;justify-content:flex-end}
 .panel-overlay.open{display:flex}
+/* ── PAINEL QUE SOBE DO RODAPÉ (Sistemas/Pessoas/Templates) ─── */
+.bottom-panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:4001;display:none;align-items:flex-end;justify-content:center}
+.bottom-panel-overlay.open{display:flex}
+.bottom-sheet{width:min(760px,100%);max-height:82vh;margin-bottom:0;background:#14151F;border:1px solid rgba(85,86,106,.4);border-bottom:none;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:0 -14px 44px rgba(0,0,0,.6);overflow:hidden;transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.85,.3,1)}
+.bottom-panel-overlay.open .bottom-sheet{transform:translateY(0)}
+.bottom-sheet-handle{display:flex;justify-content:center;padding:9px 0 3px;flex-shrink:0}
+.bottom-sheet-handle span{width:38px;height:4px;border-radius:3px;background:rgba(85,86,106,.5)}
+body.light .bottom-sheet{background:#fff;border-color:#DCD9CE}
+body.light .bottom-sheet-handle span{background:#DCD9CE}
 .side-panel{width:min(700px,100%);height:100vh;background:#14151F;border-left:1px solid rgba(85,86,106,.4);display:flex;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.7);overflow:hidden}
 .panel-hd{background:linear-gradient(90deg,#2E2013,#1C1710);padding:16px 22px;border-bottom:1px solid rgba(85,86,106,.3);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
 .panel-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#EDEDF0}
@@ -871,8 +880,9 @@ body.light .paci-name{color:#1C1D28}
 </div>
 
 <!-- MENU PANEL -->
-<div class="panel-overlay" id="menuOverlay" onclick="if(event.target===this)closeMenuPanel()">
-  <div class="side-panel">
+<div class="bottom-panel-overlay" id="menuOverlay" onclick="if(event.target===this)closeMenuPanel()">
+  <div class="bottom-sheet">
+    <div class="bottom-sheet-handle"><span></span></div>
     <div class="panel-hd">
       <div class="panel-title">📚 Referências e Acessos</div>
       <button class="close-btn" onclick="closeMenuPanel()">×</button>
