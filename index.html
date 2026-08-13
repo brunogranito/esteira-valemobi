@@ -4590,13 +4590,43 @@ function removeStandaloneAttach(id,i){
   saveStandaloneTasks(getStandaloneTasks().map(t=>t.id===id?{...t,attachments:(t.attachments||[]).filter((_,j)=>j!==i)}:t));renderTasksPanel();
 }
 
+/* ── DRAG-AND-DROP: reordenar Tarefas Avulsas ─────────── */
+let dragStandaloneId=null;
+function startDragStandalone(e,id){
+  dragStandaloneId=id;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(()=>{const row=document.getElementById('st-row-'+id);if(row)row.style.opacity='.4';},0);
+}
+function endDragStandalone(e){
+  e.currentTarget.style.opacity='1';
+  document.querySelectorAll('[id^="st-row-"]').forEach(r=>r.style.borderTopColor='');
+  dragStandaloneId=null;
+}
+function dropStandaloneTask(e,toId){
+  e.preventDefault();
+  e.currentTarget.style.borderTopColor='';
+  if(!dragStandaloneId||dragStandaloneId===toId)return;
+  const arr=[...getStandaloneTasks()];
+  const fromIdx=arr.findIndex(t=>t.id===dragStandaloneId);
+  const toIdx=arr.findIndex(t=>t.id===toId);
+  if(fromIdx<0||toIdx<0)return;
+  arr.splice(toIdx,0,arr.splice(fromIdx,1)[0]);
+  saveStandaloneTasks(arr);
+  renderTasksPanel();
+}
 function renderStandaloneTaskRow(t){
   const isRecur=t.recurrence;const hasDue=!!t.dueDate;
   const hasRef=!!(t.links?.length||t.attachments?.length);
   const totalRef=(t.links?.length||0)+(t.attachments?.length||0);
   const dueStr=hasDue?new Date(t.dueDate+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}):' ';
-  return `<div id="st-row-${t.id}" style="background:rgba(20,21,31,.4);border:1px solid rgba(85,86,106,.2);border-radius:7px;margin-bottom:6px;overflow:hidden">
+  return `<div id="st-row-${t.id}" draggable="true"
+      ondragstart="startDragStandalone(event,'${t.id}')" ondragend="endDragStandalone(event)"
+      ondragover="event.preventDefault();this.style.borderTopColor='#D98E3F'"
+      ondragleave="this.style.borderTopColor=''"
+      ondrop="dropStandaloneTask(event,'${t.id}')"
+      style="background:rgba(20,21,31,.4);border:1px solid rgba(85,86,106,.2);border-top-width:2px;border-radius:7px;margin-bottom:6px;overflow:hidden">
     <div style="display:flex;align-items:center;gap:7px;padding:8px 10px">
+      <span style="cursor:grab;color:#55566A;font-size:12px;flex-shrink:0;user-select:none" title="Arrastar para reordenar">⠿</span>
       <input type="checkbox" class="tp-task-cb" ${t.done?'checked':''} onchange="toggleStandaloneTask('${t.id}',this.checked)">
       <span class="tp-task-txt${t.done?' done':''}" style="flex:1;font-size:11px;cursor:pointer" onclick="startEditStandalone('${t.id}')">${t.tx}${isRecur?' <span style="color:#818cf8;font-size:9px">🔁</span>':''}${hasDue?' <span style="color:#fbbf24;font-size:9px">📅 '+dueStr+'</span>':''}</span>
       <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
