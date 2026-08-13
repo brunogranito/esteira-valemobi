@@ -736,7 +736,9 @@ body.light .paci-name{color:#1C1D28}
 <div class="quickbar-zone" id="quickbarZone">
   <div class="quickbar-hint"></div>
   <div class="quickbar-panel">
-    <button class="quickbar-item" onclick="openMenuPanel()"><span class="quickbar-item-icon">📚</span>Referências e Acessos</button>
+    <button class="quickbar-item" onclick="openMenuPanel('sistemas')"><span class="quickbar-item-icon">🖥</span>Sistemas & Acessos</button>
+    <button class="quickbar-item" onclick="openMenuPanel('pessoas')"><span class="quickbar-item-icon">👤</span>Pessoas & Cargos</button>
+    <button class="quickbar-item" onclick="openMenuPanel('templates')"><span class="quickbar-item-icon">📋</span>Templates</button>
   </div>
 </div>
 
@@ -2829,7 +2831,7 @@ async function saveMenuData(key, arr){
 }
 
 /* ── RENDER MENU PANEL (editable) ────────────────────── */
-function openMenuPanel(){document.getElementById('menuOverlay').classList.add('open');renderMenuPanel();}
+function openMenuPanel(tab){if(tab)menuTab=tab;document.getElementById('menuOverlay').classList.add('open');renderMenuPanel();}
 function closeMenuPanel(){document.getElementById('menuOverlay').classList.remove('open');}
 function setMenuTab(t){menuTab=t;renderMenuPanel();}
 
