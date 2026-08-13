@@ -757,7 +757,7 @@ body.light .paci-name{color:#1C1D28}
 <div class="tv-clock" id="tvClock"></div>
 
 <!-- BARRA DE ACESSOS RÁPIDOS (oculta, aparece ao passar o mouse no rodapé) -->
-<div class="quickbar-zone" id="quickbarZone">
+<div class="quickbar-zone" id="quickbarZone" onmouseenter="_menuCancelClose()" onmouseleave="_menuScheduleClose()">
   <div class="quickbar-hint"></div>
   <div class="quickbar-dock">
     <button class="quickbar-item" onclick="openMenuPanel('sistemas',this)"><span class="quickbar-item-icon">🖥</span>Sistemas</button>
@@ -895,7 +895,7 @@ body.light .paci-name{color:#1C1D28}
 </div>
 
 <!-- MENU PANEL -->
-<div class="utility-window" id="menuOverlay">
+<div class="utility-window" id="menuOverlay" onmouseenter="_menuCancelClose()" onmouseleave="_menuScheduleClose()">
   <div class="utility-window-hd">
     <div class="utility-window-title" id="menuWindowTitle">📚 Referências e Acessos</div>
     <div class="utility-window-actions">
@@ -2879,6 +2879,14 @@ function positionUtilityWindow(win,btnEl){
 }
 function closeMenuPanel(){document.getElementById('menuOverlay').classList.remove('open','minimized');}
 function minimizeMenuPanel(){document.getElementById('menuOverlay').classList.toggle('minimized');}
+// Fecha automaticamente ao tirar o mouse de cima (da janela OU do dock que a abriu),
+// com uma pequena folga pra não fechar sozinha ao passar rapidamente pela borda/vão entre os dois
+let _menuAutoCloseTimer=null;
+function _menuScheduleClose(){
+  clearTimeout(_menuAutoCloseTimer);
+  _menuAutoCloseTimer=setTimeout(()=>{closeMenuPanel();},250);
+}
+function _menuCancelClose(){clearTimeout(_menuAutoCloseTimer);}
 function setMenuTab(t){menuTab=t;renderMenuPanel();}
 
 function renderMenuPanel(){
@@ -3086,9 +3094,10 @@ function confirmAddTpl(){
 }
 // Fix openTplModal to use getTemplates()
 function openTplModal(i){
+  _menuCancelClose(); // abrir este modal por cima não deve fechar a janela de Referências por trás
   const items=getTemplates();
   const t=items[i];if(!t)return;
-  const bg=document.createElement('div');bg.className='modal-bg open';bg.style.zIndex='500';
+  const bg=document.createElement('div');bg.className='modal-bg open';bg.style.zIndex='4100';
   bg.innerHTML=`<div class="modal" style="max-width:560px">
     <div class="mhd"><div class="mhd-top">
       <div><div class="mname" style="font-size:14px">${t.name}</div><div style="font-size:11px;color:#8B8D9B">${t.desc}</div></div>
@@ -3100,6 +3109,8 @@ function openTplModal(i){
     </div></div>`;
   bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});
   document.body.appendChild(bg);
+  _menuCancelClose(); // o appendChild acima pode gerar um mouseleave sintético na janela por trás; cancela de novo, agora que já aconteceu
+  setTimeout(_menuCancelClose,0);
 }
 
 /* ── GLOBAL SEARCH ───────────────────────────────────── */
