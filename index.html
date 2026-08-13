@@ -89,6 +89,20 @@ body.tv-mode .col-count{font-size:11px}
 body.tv-mode .tv-exit-btn{display:block}
 .tv-clock{position:fixed;top:16px;left:16px;z-index:5000;color:#8B8D9B;font-size:13px;font-weight:600;display:none;font-family:'Space Grotesk',sans-serif}
 body.tv-mode .tv-clock{display:block}
+/* ── BARRA DE ACESSOS RÁPIDOS (rodapé, oculta por padrão) ─────── */
+.quickbar-zone{position:fixed;bottom:0;left:0;right:0;height:14px;z-index:4000;display:flex;justify-content:center;align-items:flex-end}
+.quickbar-hint{width:52px;height:3px;border-radius:3px 3px 0 0;background:rgba(217,142,63,.16);transition:background .25s ease,width .25s ease;margin-bottom:0}
+.quickbar-zone:hover .quickbar-hint{background:rgba(217,142,63,.55);width:76px}
+.quickbar-panel{position:absolute;bottom:0;left:0;right:0;background:#1C1D28;border-top:1px solid rgba(85,86,106,.3);box-shadow:0 -8px 22px rgba(0,0,0,.45);padding:10px 22px;display:flex;align-items:center;gap:10px;transform:translateY(100%);opacity:0;transition:transform .22s ease,opacity .18s ease;pointer-events:none}
+.quickbar-zone:hover .quickbar-panel{transform:translateY(0);opacity:1;pointer-events:auto}
+.quickbar-item{display:flex;align-items:center;gap:8px;background:none;border:1px solid rgba(85,86,106,.3);color:#D6D7E0;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.quickbar-item:hover{background:rgba(217,142,63,.12);border-color:rgba(217,142,63,.4);color:#E2A968}
+.quickbar-item-icon{font-size:14px}
+body.light .quickbar-hint{background:rgba(217,142,63,.22)}
+body.light .quickbar-panel{background:#fff;border-top-color:#DCD9CE}
+body.light .quickbar-item{color:#3A3730;border-color:#DCD9CE}
+body.light .quickbar-item:hover{background:#FAEEDA;border-color:#EF9F27;color:#854F0B}
+body.tv-mode .quickbar-zone{display:none}
 .col{min-width:196px;flex:0 0 196px;background:rgba(28,29,40,.5);border:1px solid rgba(85,86,106,.25);border-radius:12px;padding:12px}
 .col-hd{display:flex;align-items:center;gap:7px;margin-bottom:11px;padding-bottom:9px}
 .col-hd-inner{display:flex;align-items:center;gap:7px;flex:1;padding-bottom:9px;border-bottom:2px solid var(--cc,#888)}
@@ -717,6 +731,15 @@ body.light .paci-name{color:#1C1D28}
 
 <button class="tv-exit-btn" onclick="exitTvMode()">✕ Sair do Modo TV</button>
 <div class="tv-clock" id="tvClock"></div>
+
+<!-- BARRA DE ACESSOS RÁPIDOS (oculta, aparece ao passar o mouse no rodapé) -->
+<div class="quickbar-zone" id="quickbarZone">
+  <div class="quickbar-hint"></div>
+  <div class="quickbar-panel">
+    <button class="quickbar-item" onclick="openMenuPanel()"><span class="quickbar-item-icon">📚</span>Referências e Acessos</button>
+  </div>
+</div>
+
 <!-- LEFT SIDEBAR -->
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div id="leftSidebar">
@@ -740,8 +763,6 @@ body.light .paci-name{color:#1C1D28}
     <div class="sb-item" onclick="openJiraPanel();closeSidebar()"><span class="sb-item-icon">🔗</span>Jira</div>
     <div class="sb-item" onclick="openMsConfig();closeSidebar()"><span class="sb-item-icon">🪟</span>Microsoft 365</div>
     <div class="sb-item" onclick="openSettings();closeSidebar()"><span class="sb-item-icon">🔑</span>API Key (Claude)</div>
-    <div class="sb-section">Referências</div>
-    <div class="sb-item" onclick="openMenuPanel();closeSidebar()"><span class="sb-item-icon">📚</span>Referências e Acessos</div>
     <div class="sb-section">Sistema</div>
     <div class="sb-item" id="sbLogsItem" onclick="openLogs();closeSidebar()"><span class="sb-item-icon">📋</span>Logs de Atividade<span class="sb-badge-count" id="sbLogCount">…</span></div>
     <div class="sb-item" onclick="toggleTheme()"><span class="sb-item-icon" id="sbThemeIcon">🌙</span>Alternar Tema</div>
