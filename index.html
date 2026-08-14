@@ -259,6 +259,7 @@ textarea.ea{width:100%;background:rgba(20,21,31,.8);border:1px solid #D98E3F;col
 .remind-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 3px;border-radius:3px;transition:all .15s;line-height:1;opacity:.5}
 .remind-btn:hover{opacity:1;background:rgba(251,191,36,.12)}
 .remind-btn.set{opacity:1;filter:drop-shadow(0 0 4px #fbbf24)}
+.remind-btn.past{opacity:.85;filter:none;color:#7A9B6B}
 .task-remind-expand{padding:3px 8px 6px 32px;display:none}
 .task-remind-expand.open{display:block}
 .task-due-inp{background:rgba(20,21,31,.8);border:1px solid rgba(85,86,106,.3);color:#A5A7B8;padding:3px 8px;border-radius:4px;font-size:11px;outline:none;width:100%}
@@ -359,6 +360,7 @@ body.light .utility-window-actions button:hover{background:rgba(0,0,0,.06);color
 .card-bell-btn{position:absolute;top:7px;right:8px;background:none;border:none;font-size:12px;cursor:pointer;opacity:.4;transition:opacity .15s;line-height:1;padding:2px}
 .card-bell-btn:hover{opacity:1}
 .card-bell-btn.set{opacity:.85;filter:drop-shadow(0 0 3px #fbbf24)}
+.card-bell-btn.past{opacity:.7;filter:none;color:#7A9B6B}
 .card{position:relative}
 /* ── @MENTION DROPDOWN ───────────────────────────────── */
 #atDropdown{position:fixed;z-index:2000;display:none;background:#1C1D28;border:1px solid rgba(85,86,106,.45);border-radius:9px;overflow:hidden;max-height:220px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.65);min-width:220px}
@@ -4616,6 +4618,7 @@ function dropStandaloneTask(e,toId){
 }
 function renderStandaloneTaskRow(t){
   const isRecur=t.recurrence;const hasDue=!!t.dueDate;
+  const isPastDue=hasDue&&new Date(t.dueDate)<=new Date();
   const hasRef=!!(t.links?.length||t.attachments?.length);
   const totalRef=(t.links?.length||0)+(t.attachments?.length||0);
   const dueStr=hasDue?new Date(t.dueDate+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}):' ';
@@ -4637,7 +4640,7 @@ function renderStandaloneTaskRow(t){
           <option value="weekly" ${isRecur==='weekly'?'selected':''}>🔁 S</option>
           <option value="monthly" ${isRecur==='monthly'?'selected':''}>🔁 M</option>
         </select>
-        <button onclick="toggleStandaloneRemind('${t.id}')" style="background:none;border:none;color:${hasDue?'#fbbf24':'#2C2D3C'};cursor:pointer;font-size:13px;padding:2px">${hasDue?'🔔':'🔕'}</button>
+        <button onclick="toggleStandaloneRemind('${t.id}')" title="${!hasDue?'Sem lembrete':isPastDue?'Lembrete já disparado':'Lembrete agendado'}" style="background:none;border:none;color:${!hasDue?'#2C2D3C':isPastDue?'#7A9B6B':'#fbbf24'};cursor:pointer;font-size:13px;padding:2px">${!hasDue?'🔕':isPastDue?'🔔<span style="font-size:8px;margin-left:-3px;vertical-align:top">✓</span>':'🔔'}</button>
         <button onclick="toggleStandaloneRef('${t.id}')" style="background:none;border:none;color:${hasRef?'#E2A968':'#2C2D3C'};cursor:pointer;font-size:13px;padding:2px">📎${totalRef>0?'<sup style="font-size:8px">'+totalRef+'</sup>':''}</button>
         <button onclick="deleteStandaloneTask('${t.id}')" style="background:none;border:none;color:#2C2D3C;cursor:pointer;font-size:13px;padding:2px" title="Remover">🗑</button>
       </div>
@@ -5342,9 +5345,10 @@ function renderBoard(){
       const blk=p.blockers?.length?`<span class="pill" style="background:rgba(217,142,63,.13);color:rgba(217,142,63,.85)" title="Status atual registrado">📌 ${p.blockers.length}</span>`:"";
       const rdm=p.rmdDate?`<span class="pill" style="background:rgba(139,92,246,.12);color:rgba(139,92,246,.75)">🗓 ${p.rmdDate}</span>`:"";
       const hasCR=!!(p.cardReminder);
+      const isCRPast=hasCR&&new Date(p.cardReminder)<=new Date();
       const dias=daysInStage(p);
       const diasTag=dias!==null&&dias>=0?`<span class="stage-time${dias>14?' warn':''}${dias>30?' alert':''}">${dias===0?'Hoje':dias+'d aqui'}</span>`:'' ;
-      c.innerHTML=`<button class="card-bell-btn${hasCR?" set":""}" onclick="event.stopPropagation();toggleCardReminder('${p.id}')" title="${hasCR?"Lembrete: "+new Date(p.cardReminder).toLocaleString("pt-BR"):"Adicionar lembrete ao card"}">${hasCR?"🔔":"🔕"}</button>
+      c.innerHTML=`<button class="card-bell-btn${hasCR?(isCRPast?" past":" set"):""}" onclick="event.stopPropagation();toggleCardReminder('${p.id}')" title="${!hasCR?"Adicionar lembrete ao card":isCRPast?"Lembrete já disparado: "+new Date(p.cardReminder).toLocaleString("pt-BR"):"Lembrete: "+new Date(p.cardReminder).toLocaleString("pt-BR")}">${!hasCR?"🔕":isCRPast?'🔔<span style="font-size:8px;margin-left:-3px;vertical-align:top">✓</span>':"🔔"}</button>
         <div class="card-name" style="padding-right:20px">${p.name}</div>
         <div class="card-code">${p.code}</div>
         <div class="card-row">${prioBadge}${blk}${rdm}${diasTag}</div>
@@ -5535,11 +5539,12 @@ function renderModal(){
   const mb=document.getElementById("modalBell");
   if(mb){
     const hasCR=!!(p.cardReminder);
-    mb.textContent=hasCR?"🔔":"🔕";
+    const isCRPast=hasCR&&new Date(p.cardReminder)<=new Date();
+    mb.textContent=!hasCR?"🔕":isCRPast?"🔔✓":"🔔";
     mb.style.opacity=hasCR?"1":".55";
-    mb.style.color=hasCR?"#fbbf24":"";
-    mb.style.borderColor=hasCR?"rgba(251,191,36,.4)":"rgba(85,86,106,.3)";
-    mb.title=hasCR?"Lembrete ativo: "+new Date(p.cardReminder).toLocaleString("pt-BR")+" (clique para remover)":"Adicionar lembrete ao card";
+    mb.style.color=isCRPast?"#7A9B6B":hasCR?"#fbbf24":"";
+    mb.style.borderColor=isCRPast?"rgba(122,155,107,.4)":hasCR?"rgba(251,191,36,.4)":"rgba(85,86,106,.3)";
+    mb.title=!hasCR?"Adicionar lembrete ao card":isCRPast?"Lembrete já disparado: "+new Date(p.cardReminder).toLocaleString("pt-BR")+" (clique para remover)":"Lembrete ativo: "+new Date(p.cardReminder).toLocaleString("pt-BR")+" (clique para remover)";
   }
   document.getElementById("mPct").textContent=p.progress;
   document.getElementById("mBar").style.width=p.progress+"%";
@@ -5892,7 +5897,8 @@ function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds,_taskNum
         title="Remover (este card ou todos os cards)">✕</button>`;
     }
     h+=`<button class="na-btn${dis?" is-off":""}" onclick="toggleDis('${tid}','${activeStage}')">${dis?"✕ N/A":"N/A"}</button>`;
-    h+=`<button class="remind-btn${hasDue?" set":""}" onclick="toggleReminderRow('${tid}')" title="${hasDue?'Lembrete: '+new Date(due).toLocaleString("pt-BR"):'Adicionar lembrete'}">${hasDue?"🔔":"🔕"}</button>`;
+    const isPastDueTask=hasDue&&new Date(due)<=new Date();
+    h+=`<button class="remind-btn${hasDue?(isPastDueTask?" past":" set"):""}" onclick="toggleReminderRow('${tid}')" title="${!hasDue?'Adicionar lembrete':isPastDueTask?'Lembrete já disparado: '+new Date(due).toLocaleString("pt-BR"):'Lembrete: '+new Date(due).toLocaleString("pt-BR")}">${!hasDue?"🔕":isPastDueTask?'🔔<span style="font-size:8px;margin-left:-3px;vertical-align:top">✓</span>':"🔔"}</button>`;
     h+=`<button onclick="toggleTaskRef('${tid}')" title="Referências e anexos"
       style="background:none;border:none;color:${hasRef?'#E2A968':'#2C2D3C'};cursor:pointer;font-size:12px;padding:2px 3px;position:relative">
       📎${totalRefs>0?`<span style="font-size:8px;color:${hasRef?'#E2A968':'#55566A'};vertical-align:super;margin-left:1px">${totalRefs}</span>`:''}
