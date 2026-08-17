@@ -802,6 +802,7 @@ body.light .paci-name{color:#1C1D28}
     <div class="sb-item" onclick="openSettings();closeSidebar()"><span class="sb-item-icon">🔑</span>API Key (Claude)</div>
     <div class="sb-section">Sistema</div>
     <div class="sb-item" id="sbLogsItem" onclick="openLogs();closeSidebar()"><span class="sb-item-icon">📋</span>Logs de Atividade<span class="sb-badge-count" id="sbLogCount">…</span></div>
+    <div class="sb-item" onclick="openTrashPanel();closeSidebar()"><span class="sb-item-icon">🗑</span>Lixeira<span class="sb-badge-count" id="trashCount" style="display:none">0</span></div>
     <div class="sb-item" onclick="toggleTheme()"><span class="sb-item-icon" id="sbThemeIcon">🌙</span>Alternar Tema</div>
   </nav>
 </div>
@@ -975,6 +976,17 @@ body.light .paci-name{color:#1C1D28}
       <button class="close-btn" onclick="closeLogs()">×</button>
     </div>
     <div class="panel-body" id="logsBody"></div>
+  </div>
+</div>
+
+<!-- TRASH PANEL -->
+<div class="panel-overlay" id="trashOverlay" onclick="if(event.target===this)closeTrashPanel()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">🗑 Lixeira</div>
+      <button class="close-btn" onclick="closeTrashPanel()">×</button>
+    </div>
+    <div class="panel-body" id="trashBody"></div>
   </div>
 </div>
 
@@ -2562,9 +2574,12 @@ function addComment(){
 }
 function deleteComment(cid){
   const p=getP(selId);if(!p)return;
-  if(!confirm('Excluir este comentário?'))return;
+  if(!confirm('Excluir este comentário?\n\nEle vai para a lixeira e pode ser restaurado.'))return;
+  const c=(p.comments||[]).find(x=>x.id===cid);
+  if(c)trashPush('comment',`"${(c.text||'').slice(0,50)}${(c.text||'').length>50?'…':''}" em ${p.name}`,{projectId:p.id,comment:JSON.parse(JSON.stringify(c))});
   setP(selId,{comments:(p.comments||[]).filter(c=>c.id!==cid)});
   renderComments();
+  showToast('🗑 Movido para a lixeira','Pode ser restaurado.');
 }
 
 // ── REAL-TIME POLLING (30s) ─────────────────────────
@@ -4527,7 +4542,13 @@ function toggleStandaloneTask(id,val){
   }
   renderTasksPanel();
 }
-function deleteStandaloneTask(id){saveStandaloneTasks(getStandaloneTasks().filter(t=>t.id!==id));renderTasksPanel();}
+function deleteStandaloneTask(id){
+  const t=getStandaloneTasks().find(x=>x.id===id);
+  if(t)trashPush('standalone',t.tx||'(tarefa sem texto)',JSON.parse(JSON.stringify(t)));
+  saveStandaloneTasks(getStandaloneTasks().filter(x=>x.id!==id));
+  renderTasksPanel();
+  if(t)showToast('🗑 Movido para a lixeira','Pode ser restaurado.');
+}
 function startEditStandalone(id){
   const row=document.getElementById('st-row-'+id);if(!row)return;
   const t=getStandaloneTasks().find(t=>t.id===id);if(!t)return;
@@ -4911,6 +4932,94 @@ function vlWarn(context,e){
   }catch(_){/* logger nunca deve quebrar o app */}
 }
 function vlErrors(){const l=lsGet('errorLog')||[];console.table(l);return l;}
+
+/* ── LIXEIRA / DESFAZER ────────────────────────────────
+   Guarda os últimos 20 itens excluídos por 30 dias, permitindo
+   restaurar. Cobre cards, tarefas avulsas e comentários. */
+const TRASH_MAX=20, TRASH_DAYS=30;
+function getTrash(){
+  const t=lsGet('trash')||[];
+  const cutoff=Date.now()-TRASH_DAYS*86400000;
+  return t.filter(x=>x.ts>cutoff);
+}
+function saveTrash(arr){
+  const trimmed=arr.slice(-TRASH_MAX);
+  lsSet('trash',trimmed);
+  sbSet('trash',trimmed).catch(()=>{});
+}
+function trashPush(type,label,payload){
+  const t=getTrash();
+  t.push({id:'tr'+Date.now()+Math.random().toString(36).slice(2,6),ts:Date.now(),type,label,payload,by:currentUser?.name||''});
+  saveTrash(t);
+  updateTrashBadge();
+}
+function updateTrashBadge(){
+  const el=document.getElementById('trashCount');
+  if(el){const n=getTrash().length;el.textContent=n;el.style.display=n?'inline-block':'none';}
+}
+function restoreFromTrash(trashId){
+  const t=getTrash();
+  const item=t.find(x=>x.id===trashId);
+  if(!item)return;
+  try{
+    if(item.type==='card'){
+      if(projects.some(p=>p.id===item.payload.id)){showToast('Já existe','Esse card já está no board.');return;}
+      projects.push(item.payload);
+      addToOrder(item.payload.stage,item.payload.id);
+      saveProjects();saveOrders();renderBoard();renderStats();
+    } else if(item.type==='standalone'){
+      const arr=getStandaloneTasks();
+      if(arr.some(x=>x.id===item.payload.id)){showToast('Já existe','Essa tarefa já está na lista.');return;}
+      arr.push(item.payload);saveStandaloneTasks(arr);renderTasksPanel();
+    } else if(item.type==='comment'){
+      const p=getP(item.payload.projectId);
+      if(!p){showToast('Card não encontrado','O card desse comentário não existe mais.');return;}
+      setP(p.id,{comments:[...(p.comments||[]),item.payload.comment]});
+      if(selId===p.id&&curTab==='cmt')renderComments();
+    }
+    saveTrash(t.filter(x=>x.id!==trashId));
+    updateTrashBadge();renderTrashPanel();
+    showToast('♻ Restaurado',item.label);
+  }catch(e){vlWarn('restaurar da lixeira',e);showToast('Erro ao restaurar','Veja o console (F12) para detalhes.');}
+}
+function purgeTrashItem(trashId){
+  if(!confirm('Remover definitivamente este item da lixeira?\n\nDepois disso não será mais possível restaurar.'))return;
+  saveTrash(getTrash().filter(x=>x.id!==trashId));
+  updateTrashBadge();renderTrashPanel();
+}
+function emptyTrash(){
+  const n=getTrash().length;
+  if(!n)return;
+  if(!confirm(`Esvaziar a lixeira (${n} ${n===1?'item':'itens'})?\n\nDepois disso não será mais possível restaurar.`))return;
+  saveTrash([]);updateTrashBadge();renderTrashPanel();
+  showToast('Lixeira esvaziada','');
+}
+function openTrashPanel(){document.getElementById('trashOverlay').classList.add('open');renderTrashPanel();}
+function closeTrashPanel(){document.getElementById('trashOverlay').classList.remove('open');}
+function renderTrashPanel(){
+  const body=document.getElementById('trashBody');if(!body)return;
+  const t=[...getTrash()].reverse();
+  const icons={card:'📋',standalone:'🗒',comment:'💬'};
+  const names={card:'Card',standalone:'Tarefa avulsa',comment:'Comentário'};
+  body.innerHTML=t.length?`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:11px;color:#8B8D9B">${t.length} ${t.length===1?'item':'itens'} · itens são removidos automaticamente após ${TRASH_DAYS} dias</span>
+      <button onclick="emptyTrash()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#f87171;padding:4px 10px;border-radius:6px;font-size:10px;cursor:pointer">Esvaziar lixeira</button>
+    </div>
+    ${t.map(item=>{
+      const when=new Date(item.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return`<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.25);border-radius:8px;padding:10px 12px;margin-bottom:7px">
+        <span style="font-size:16px;flex-shrink:0">${icons[item.type]||'🗑'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:#EDEDF0;overflow-wrap:break-word">${item.label}</div>
+          <div style="font-size:9px;color:#55566A">${names[item.type]||item.type} · excluído em ${when}${item.by?' por '+item.by:''}</div>
+        </div>
+        <button onclick="restoreFromTrash('${item.id}')" style="flex-shrink:0;background:rgba(122,155,107,.15);border:1px solid rgba(122,155,107,.4);color:#7A9B6B;padding:5px 11px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer">♻ Restaurar</button>
+        <button onclick="purgeTrashItem('${item.id}')" title="Remover definitivamente" style="flex-shrink:0;background:none;border:none;color:#55566A;cursor:pointer;font-size:13px;padding:2px">✕</button>
+      </div>`;
+    }).join('')}`
+  :'<div style="text-align:center;color:#55566A;padding:40px 20px;font-size:12px">Lixeira vazia.<br><span style="font-size:10px">Cards, tarefas avulsas e comentários excluídos aparecem aqui por '+TRASH_DAYS+' dias.</span></div>';
+}
 // Timestamp seguro para nome de arquivo (sem caracteres inválidos): AAAA-MM-DD_HH-mm
 function fileTimestamp(){
   const d=new Date();
@@ -5712,13 +5821,14 @@ function confirmArchive(id){
 }
 function confirmDelete(id){
   const p=getP(id);if(!p)return;
-  if(confirm(`Excluir permanentemente "${p.name}"?\n\n⚠️ Esta ação não pode ser desfeita.`)){
+  if(confirm(`Excluir "${p.name}"?\n\nO card vai para a lixeira e pode ser restaurado por ${TRASH_DAYS} dias.`)){
+    trashPush('card',p.name+(p.code&&p.code!=='—'?' ('+p.code+')':''),JSON.parse(JSON.stringify(p)));
     projects=projects.filter(x=>x.id!==id);
     removeFromOrder(p.stage,id);
     saveProjects();
     closeModal();
     renderBoard();renderStats();
-    showToast('🗑 Excluído',`"${p.name}" removido permanentemente.`);
+    showToast('🗑 Movido para a lixeira',`"${p.name}" pode ser restaurado.`);
   }
 }
 
@@ -6605,6 +6715,9 @@ async function initApp(){
   renderBoard();
   renderStats();
   if(boardView==='table')setBoardView('table');
+  updateTrashBadge();
+  // Sincroniza a lixeira do Supabase em segundo plano (mesmo padrão dos outros dados)
+  sbGet('trash').then(t=>{if(Array.isArray(t)){lsSet('trash',t);updateTrashBadge();}}).catch(()=>{});
   requestNotifPerm();
   checkReminders();
   setInterval(checkReminders,60000);
