@@ -1440,21 +1440,25 @@ function deleteComment(cid){
   showToast('🗑 Movido para a lixeira','Pode ser restaurado.');
 }
 
-// ── REAL-TIME POLLING (30s) ─────────────────────────
-let lastSbCheck=Date.now();
+// ── SINCRONIZAÇÃO PERIÓDICA (30s) ─────────────────────
+// Antes este bloco lia remote[0]?.updated_at — ou seja, procurava o campo
+// updated_at DENTRO do primeiro projeto do array, onde ele nunca existe
+// (updated_at é coluna da linha no banco, não campo do projeto). Resultado:
+// a comparação sempre dava 0 e a atualização automática nunca acontecia.
+// Agora consultamos o updated_at real da linha via sbGetMeta.
 setInterval(async()=>{
   if(document.hidden)return;
   try{
+    const serverVersion=await sbGetMeta('projects');
+    if(!serverVersion)return;
+    if(remoteVersions['projects']&&serverVersion===remoteVersions['projects'])return; // nada mudou
     const remote=await sbGet('projects');
     if(remote?.length){
-      const remoteTime=new Date(remote[0]?.updated_at||0).getTime()||0;
-      if(remoteTime>lastSbCheck){
-        projects=remote;lsSet('projects',projects);
-        renderBoard();renderStats();
-        const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        setSbBadge('synced',`☁ Atualizado às ${now} <span class="sync-dot active"></span>`);
-        lastSbCheck=Date.now();
-      }
+      projects=remote;lsSet('projects',projects);
+      noteRemoteVersion('projects',serverVersion);
+      renderBoard();renderStats();
+      const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      setSbBadge('synced',`☁ Atualizado às ${now} <span class="sync-dot active"></span>`);
     }
   }catch(e){vlWarn('polling de sincronização',e);}
 },30000);
@@ -4069,14 +4073,81 @@ async function sbSet(id,value){
 }
 
 // Dual write: localStorage (imediato) + Supabase (background)
-function cloudSave(key,value){
+/* ── DETECÇÃO DE CONFLITO DE ESCRITA ────────────────────
+   O sistema salva o conjunto inteiro (ex: todos os projetos) de uma vez.
+   Se duas pessoas editam ao mesmo tempo, quem salva depois sobrescreve
+   o trabalho de quem salvou antes — silenciosamente, sem erro.
+   Para evitar isso, guardamos o 'updated_at' de cada chave no momento
+   em que a carregamos. Antes de salvar, conferimos se o servidor ainda
+   está nessa versão. Se mudou, avisamos em vez de sobrescrever. */
+const remoteVersions={}; // { chave: updated_at visto por último }
+
+async function sbGetMeta(id){
+  try{
+    const r=await sbFetch(`esteira_data?id=eq.${encodeURIComponent(id)}&select=updated_at`);
+    if(!r.ok)return null;
+    const d=await r.json();
+    return d?.[0]?.updated_at??null;
+  }catch(e){return null;}
+}
+
+function noteRemoteVersion(key,updatedAt){
+  if(updatedAt)remoteVersions[key]=updatedAt;
+}
+
+function showConflictAlert(key){
+  const labels={projects:'os cards do board',orders:'a ordem dos cards',standaloneTasks:'as tarefas avulsas',
+    menu_people:'o cadastro de pessoas',menu_systems:'os sistemas e acessos',menu_templates:'os templates'};
+  const what=labels[key]||`os dados (${key})`;
+  let el=document.getElementById('conflictAlert');
+  if(!el){
+    el=document.createElement('div');
+    el.id='conflictAlert';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:7000;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(el);
+  }
+  el.innerHTML=`<div style="background:#1C1D28;border:1px solid rgba(251,191,36,.45);border-radius:14px;padding:24px;width:min(460px,100%);box-shadow:0 20px 56px rgba(0,0,0,.65)">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#fbbf24;margin-bottom:10px">⚠ Alguém editou ao mesmo tempo</div>
+    <div style="font-size:12px;color:#D6D7E0;line-height:1.6;margin-bottom:8px">
+      Outra pessoa alterou <strong>${what}</strong> depois que esta página carregou.
+    </div>
+    <div style="font-size:12px;color:#A5A7B8;line-height:1.6;margin-bottom:18px">
+      Sua alteração <strong>não foi salva na nuvem</strong> para não apagar o trabalho da outra pessoa.
+      Ela continua guardada aqui neste navegador. Recarregue para ver a versão atualizada e refaça a mudança.
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="location.reload()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Recarregar agora</button>
+      <button onclick="document.getElementById('conflictAlert').remove()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.4);color:#8B8D9B;padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Depois</button>
+    </div>
+  </div>`;
+  el.style.display='flex';
+}
+
+async function cloudSave(key,value){
   lsSet(key,value);
   if(LS_ONLY.includes(key))return; // sensível: só localStorage
   setSbBadge('syncing','Salvando…');
-  sbSet(key,value).then(ok=>{
-    const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    setSbBadge(ok?'synced':'offline', ok?`☁ Salvo às ${now}`:'⚠ Salvo local');
-  });
+
+  // Confere se o servidor mudou desde a última vez que vimos esta chave
+  const known=remoteVersions[key];
+  if(known){
+    const current=await sbGetMeta(key);
+    if(current&&current!==known){
+      setSbBadge('offline','⚠ Conflito — salvo local');
+      vlWarn(`conflito de escrita em '${key}'`,`local viu ${known}, servidor está em ${current}`);
+      showConflictAlert(key);
+      return; // não sobrescreve o trabalho do outro
+    }
+  }
+
+  const ok=await sbSet(key,value);
+  const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  setSbBadge(ok?'synced':'offline', ok?`☁ Salvo às ${now}`:'⚠ Salvo local');
+  if(ok){
+    // Atualiza a versão conhecida para o próximo salvamento
+    const fresh=await sbGetMeta(key);
+    noteRemoteVersion(key,fresh);
+  }
 }
 
 /* ── API KEY ────────────────────────────────────────── */
@@ -5719,6 +5790,13 @@ async function initApp(){
       Promise.all([sbGet('projects'),sbGet('orders'),sbGet('jira_cfg')]),
       timeout.then(()=>{throw new Error('timeout');})
     ]);
+
+    // Guarda a versão que acabamos de carregar — é a referência usada para
+    // detectar se alguém alterou os dados antes do nosso próximo salvamento
+    Promise.all([sbGetMeta('projects'),sbGetMeta('orders')]).then(([vp,vo])=>{
+      noteRemoteVersion('projects',vp);
+      noteRemoteVersion('orders',vo);
+    }).catch(()=>{});
 
     let updated=false;
     if(sbProjects?.length){
