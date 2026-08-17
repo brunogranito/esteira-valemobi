@@ -4129,15 +4129,16 @@ async function sbGet(id){
   }catch(e){vlWarn(`ler '${id}' do Supabase`,e);return null;}
 }
 
-async function sbSet(id,value){
+async function sbSet(id,value,ts){
+  const stamp=ts||new Date().toISOString();
   try{
     const r=await sbFetch('esteira_data',{
       method:'POST',
       headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({id,value,updated_at:new Date().toISOString()})
+      body:JSON.stringify({id,value,updated_at:stamp})
     });
     if(!r.ok)vlWarn(`salvar '${id}' no Supabase`,`HTTP ${r.status}`);
-    return r.ok;
+    return r.ok?stamp:false;
   }catch(e){vlWarn(`salvar '${id}' no Supabase`,e);return false;}
 }
 
@@ -4192,9 +4193,22 @@ function showConflictAlert(key){
   el.style.display='flex';
 }
 
+// Fila por chave: garante que duas gravações da MESMA chave nunca rodem em
+// paralelo. Sem isso, duas ações rápidas (ex: arrastar 2 cards seguidos)
+// podiam disparar um "falso conflito" — a 2ª gravação enxergava a versão que
+// a 1ª tinha acabado de escrever e achava que era outra pessoa mexendo.
+const _saveQueue={};
+
 async function cloudSave(key,value){
   lsSet(key,value);
   if(LS_ONLY.includes(key))return; // sensível: só localStorage
+  const prev=_saveQueue[key]||Promise.resolve();
+  const task=prev.then(()=>_doCloudSave(key,value)).catch(e=>vlWarn(`fila de gravação '${key}'`,e));
+  _saveQueue[key]=task;
+  return task;
+}
+
+async function _doCloudSave(key,value){
   setSbBadge('syncing','Salvando…');
 
   // Confere se o servidor mudou desde a última vez que vimos esta chave
@@ -4209,14 +4223,13 @@ async function cloudSave(key,value){
     }
   }
 
-  const ok=await sbSet(key,value);
+  // O timestamp é gerado aqui e usado diretamente como "versão conhecida" —
+  // sem buscar de novo no servidor depois, o que fechava a janela de corrida
+  const stamp=new Date().toISOString();
+  const ok=await sbSet(key,value,stamp);
   const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   setSbBadge(ok?'synced':'offline', ok?`☁ Salvo às ${now}`:'⚠ Salvo local');
-  if(ok){
-    // Atualiza a versão conhecida para o próximo salvamento
-    const fresh=await sbGetMeta(key);
-    noteRemoteVersion(key,fresh);
-  }
+  if(ok)noteRemoteVersion(key,stamp);
 }
 
 /* ── API KEY ────────────────────────────────────────── */
