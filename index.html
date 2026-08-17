@@ -52,14 +52,23 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 body.light .vt-btn{background:#fff;border-color:#DCD9CE;color:#7A776B}
 body.light .vt-btn.active{background:#FAEEDA;border-color:#EF9F27;color:#854F0B}
 .tbl-wrap{overflow-x:auto;border:1px solid #2C2D3C;border-radius:10px}
-.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:920px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:920px;table-layout:fixed}
 .tbl th{text-align:left;background:#1C1D28;color:#8B8D9B;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:9px 12px;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
 .tbl th:hover{color:#D6D7E0}
 .tbl th .sort-arrow{opacity:.5;margin-left:3px;font-size:9px}
-.tbl td{padding:9px 12px;border-top:1px solid #2C2D3C;color:#D6D7E0;vertical-align:middle}
+.tbl td{padding:9px 12px;border-top:1px solid #2C2D3C;color:#D6D7E0;vertical-align:middle;overflow-wrap:break-word;word-break:break-word}
 .tbl tr.tbl-row{cursor:pointer}
 .tbl tr.tbl-row:hover td{background:rgba(217,142,63,.06)}
-.tbl .tbl-name{font-weight:600;color:#EDEDF0}
+.tbl .tbl-name{font-weight:600;color:#EDEDF0;overflow-wrap:break-word;word-break:break-word}
+.tbl .tbl-code{overflow-wrap:break-word;word-break:break-word}
+.tbl th:first-child,.tbl td:first-child{width:26%}
+.tbl th:nth-child(2),.tbl td:nth-child(2){width:13%}
+.tbl th:nth-child(3),.tbl td:nth-child(3){width:11%}
+.tbl th:nth-child(4),.tbl td:nth-child(4){width:13%}
+.tbl th:nth-child(5),.tbl td:nth-child(5){width:11%}
+.tbl th:nth-child(6),.tbl td:nth-child(6){width:9%}
+.tbl th:nth-child(7),.tbl td:nth-child(7){width:9%}
+.tbl th:nth-child(8),.tbl td:nth-child(8){width:8%}
 .tbl .tbl-code{color:#8B8D9B;font-size:10px}
 .tbl-stage-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap}
 .tbl-prio{font-size:11px;white-space:nowrap}
@@ -117,7 +126,7 @@ body.tv-mode .quickbar-zone{display:none}
 .card.dragging{opacity:.3;border-style:dashed;transform:scale(.97)}
 .card.drag-over{border-color:#8b5cf6;background:rgba(139,92,246,.08)}
 .col.drop-active{background:rgba(217,142,63,.05);border-color:rgba(217,142,63,.3)}
-.card-name{font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:3px;line-height:1.3}
+.card-name{font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:3px;line-height:1.3;overflow-wrap:break-word;word-break:break-word}
 .card-code{font-size:10px;color:#55566A;font-family:monospace;margin-bottom:7px}
 .card-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .pill{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600}
