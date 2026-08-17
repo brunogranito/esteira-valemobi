@@ -2522,6 +2522,94 @@ function checkReminders(){
   updateBell(overdueCount+getPendingMentions().length);
 }
 
+/* ── RESUMO DE LEMBRETES PERDIDOS ───────────────────────
+   Os lembretes só disparam com o site aberto (limitação de rodar
+   100% no navegador). Este resumo cobre a lacuna: ao entrar, mostra
+   o que venceu enquanto você estava fora, para nada passar batido. */
+function collectOverdueReminders(){
+  const now=new Date();
+  const out=[];
+  projects.filter(p=>!p.archived).forEach(p=>{
+    if(p.cardReminder){
+      const d=new Date(p.cardReminder);
+      if(d<=now)out.push({kind:'card',pid:p.id,pname:p.name,text:'Lembrete geral do card',when:d});
+    }
+    const clS=CL[p.stage]||[];
+    const allT=clS.flatMap(s=>s.t);
+    [...allT,...((p.customTasks||{})[p.stage]||[])].forEach(t=>{
+      const tid=t.id||t.tid;
+      const due=(p.taskDates||{})[tid];
+      if(!due)return;
+      const d=new Date(due);
+      if(d<=now)out.push({kind:'task',pid:p.id,pname:p.name,text:findTaskText(p,tid)||t.tx||'Tarefa',when:d});
+    });
+  });
+  getStandaloneTasks().forEach(t=>{
+    if(t.done||!t.dueDate)return;
+    const d=new Date(t.dueDate);
+    if(d<=now)out.push({kind:'standalone',pid:'__standalone__',pname:'Tarefa avulsa',text:t.tx,when:d});
+  });
+  return out.sort((a,b)=>b.when-a.when);
+}
+
+function showWelcomeDigest(){
+  const overdue=collectOverdueReminders();
+  const mentions=getPendingMentions();
+  if(!overdue.length&&!mentions.length)return;
+
+  // Não repete o resumo se já foi mostrado nas últimas 4 horas
+  const lastShown=lsGet('digestShownTs')||0;
+  if(Date.now()-lastShown<4*60*60*1000)return;
+  lsSet('digestShownTs',Date.now());
+
+  const fmt=d=>{
+    const diffDays=Math.floor((Date.now()-d.getTime())/86400000);
+    const hora=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    if(diffDays===0)return`hoje às ${hora}`;
+    if(diffDays===1)return`ontem às ${hora}`;
+    return`${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} às ${hora}`;
+  };
+
+  let overlay=document.getElementById('digestOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='digestOverlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.addEventListener('click',e=>{if(e.target===overlay)closeWelcomeDigest();});
+    document.body.appendChild(overlay);
+  }
+
+  const total=overdue.length+mentions.length;
+  overlay.innerHTML=`<div style="background:#1C1D28;border:1px solid rgba(85,86,106,.35);border-radius:14px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 56px rgba(0,0,0,.6);overflow:hidden">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid rgba(85,86,106,.25)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#EDEDF0;margin-bottom:3px">👋 Enquanto você esteve fora</div>
+      <div style="font-size:11px;color:#8B8D9B">${total} ${total===1?'item precisa':'itens precisam'} da sua atenção</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 22px">
+      ${overdue.length?`<div style="font-size:9px;font-weight:700;color:#E2A968;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🔔 Lembretes que venceram (${overdue.length})</div>
+      ${overdue.slice(0,12).map(o=>`<div onclick="closeWelcomeDigest();${o.pid==='__standalone__'?'openTasksPanel()':`openModal('${o.pid}')`}" style="background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.22);border-left:3px solid #D98E3F;border-radius:7px;padding:9px 11px;margin-bottom:6px;cursor:pointer">
+        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px">${o.pname}</div>
+        <div style="font-size:11px;color:#A5A7B8;line-height:1.35">${o.text}</div>
+        <div style="font-size:9px;color:#55566A;margin-top:3px">venceu ${fmt(o.when)}</div>
+      </div>`).join('')}
+      ${overdue.length>12?`<div style="font-size:10px;color:#55566A;text-align:center;padding:4px 0 8px">+ ${overdue.length-12} outros — veja no sino 🔔</div>`:''}`:''}
+      ${mentions.length?`<div style="font-size:9px;font-weight:700;color:#B9A6D9;text-transform:uppercase;letter-spacing:.6px;margin:${overdue.length?'14px':'0'} 0 8px">💬 Menções para você (${mentions.length})</div>
+      ${mentions.slice(0,6).map(m=>`<div onclick="closeWelcomeDigest();openModal('${m.pid}');setTimeout(()=>sw('cmt'),150)" style="background:rgba(128,103,176,.08);border:1px solid rgba(128,103,176,.25);border-radius:7px;padding:9px 11px;margin-bottom:6px;cursor:pointer">
+        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px">${m.pname}</div>
+        <div style="font-size:10px;color:#8B8D9B">${m.author}: "${(m.text||'').slice(0,70)}${(m.text||'').length>70?'…':''}"</div>
+      </div>`).join('')}`:''}
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid rgba(85,86,106,.25);display:flex;gap:8px">
+      <button onclick="closeWelcomeDigest()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Entendi, vamos lá</button>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+function closeWelcomeDigest(){
+  const o=document.getElementById('digestOverlay');
+  if(o)o.style.display='none';
+}
+
 /* ── MENÇÕES (@nome nos comentários) ─────────────────── */
 function isMentioned(text){
   if(!currentUser||!text)return false;
@@ -5668,6 +5756,10 @@ async function initApp(){
     setSbBadge('offline','⚠ Offline — dados locais');
     console.warn('Supabase:',e.message);
   }
+
+  // Resumo do que venceu enquanto o site estava fechado — só depois de
+  // sincronizar, para não mostrar informação desatualizada
+  try{setTimeout(showWelcomeDigest,700);}catch(e){vlWarn('resumo de boas-vindas',e);}
 }
 
 
