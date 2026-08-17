@@ -2583,7 +2583,7 @@ setInterval(async()=>{
         lastSbCheck=Date.now();
       }
     }
-  }catch(e){}
+  }catch(e){vlWarn('polling de sincronização',e);}
 },30000);
 
 
@@ -2617,7 +2617,7 @@ async function sbRegisterRpc(email,name,pwHash){
 }
 async function sbUpdateLastLogin(id){
   try{await sbFetch('rpc/update_last_login',{method:'POST',
-    body:JSON.stringify({p_id:id})});}catch(e){}
+    body:JSON.stringify({p_id:id})});}catch(e){vlWarn('atualizar último login',e);}
 }
 
 // Simple hash (SHA-256 via SubtleCrypto)
@@ -2724,7 +2724,7 @@ async function logActivity(action,detail='',projectId='',projectName=''){
         user_name:currentUser.name||currentUser.email||'',
         action,detail,project_id:projectId,project_name:projectName,
       })});
-  }catch(e){}
+  }catch(e){vlWarn('registrar log de atividade',e);}
 }
 
 function openLogs(){document.getElementById('logsOverlay').classList.add('open');renderLogs();}
@@ -2853,7 +2853,7 @@ async function loadMenuData(){
     if(sbTemplates){menuData.templates=sbTemplates;lsSet('menuTemplates',sbTemplates);}
     // Re-renderiza caso algum painel que dependa dessas listas já esteja aberto
     if(document.getElementById('menuOverlay')?.classList.contains('open'))renderMenuPanel();
-  }catch(e){}
+  }catch(e){vlWarn('carregar Sistemas/Pessoas/Templates do Supabase',e);}
 }
 function getSystems()  { return menuData.systems   || SYSTEMS;   }
 function getPeople()   { return menuData.people    || PEOPLE;    }
@@ -2863,7 +2863,7 @@ async function saveMenuData(key, arr){
   const lsKey = {systems:'menuSystems', people:'menuPeople', templates:'menuTemplates'}[key];
   menuData[key] = arr;
   lsSet(lsKey, arr);
-  try{ await sbSet('menu_'+key, arr); } catch(e){}
+  try{ await sbSet('menu_'+key, arr); } catch(e){vlWarn('salvar '+key+' no Supabase',e);}
 }
 
 /* ── RENDER MENU PANEL (editable) ────────────────────── */
@@ -4895,6 +4895,22 @@ let taskEditing=null; // id of task being edited inline
 
 /* ── STORAGE ────────────────────────────────────────── */
 const PFX="vl_";
+/* ── LOG DISCRETO DE FALHAS ─────────────────────────────
+   Antes vários catch(e){} engoliam erros sem deixar rastro, o que
+   escondeu bugs reais no passado. Este logger não interrompe o fluxo
+   nem incomoda o usuário — só registra no console (F12) e guarda os
+   últimos 30 no localStorage, pra diagnóstico posterior.
+   Use vlErrors() no console pra listar. */
+function vlWarn(context,e){
+  try{
+    const msg=(e&&e.message)||String(e||'erro desconhecido');
+    console.warn(`[Esteira] ${context}:`,msg);
+    const log=lsGet('errorLog')||[];
+    log.push({ts:new Date().toISOString(),context,msg});
+    lsSet('errorLog',log.slice(-30));
+  }catch(_){/* logger nunca deve quebrar o app */}
+}
+function vlErrors(){const l=lsGet('errorLog')||[];console.table(l);return l;}
 // Timestamp seguro para nome de arquivo (sem caracteres inválidos): AAAA-MM-DD_HH-mm
 function fileTimestamp(){
   const d=new Date();
@@ -4902,7 +4918,7 @@ function fileTimestamp(){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
 }
 function lsGet(k){try{const v=localStorage.getItem(PFX+k);return v?JSON.parse(v):null;}catch(e){return null;}}
-function lsSet(k,v){try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(e){}}
+function lsSet(k,v){try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(e){console.warn('[Esteira] falha ao salvar localmente ('+k+'):',e&&e.message);}}
 
 /* ── SUPABASE (banco de dados na nuvem) ─────────────── */
 const SB_URL='https://lomoavrvrwgyjbhgjqrd.supabase.co';
@@ -4936,10 +4952,10 @@ async function sbFetch(path,opts={}){
 async function sbGet(id){
   try{
     const r=await sbFetch(`esteira_data?id=eq.${encodeURIComponent(id)}&select=value`);
-    if(!r.ok)return null;
+    if(!r.ok){vlWarn(`ler '${id}' do Supabase`,`HTTP ${r.status}`);return null;}
     const d=await r.json();
     return d?.[0]?.value??null;
-  }catch(e){return null;}
+  }catch(e){vlWarn(`ler '${id}' do Supabase`,e);return null;}
 }
 
 async function sbSet(id,value){
@@ -4949,8 +4965,9 @@ async function sbSet(id,value){
       headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify({id,value,updated_at:new Date().toISOString()})
     });
+    if(!r.ok)vlWarn(`salvar '${id}' no Supabase`,`HTTP ${r.status}`);
     return r.ok;
-  }catch(e){return false;}
+  }catch(e){vlWarn(`salvar '${id}' no Supabase`,e);return false;}
 }
 
 // Dual write: localStorage (imediato) + Supabase (background)
