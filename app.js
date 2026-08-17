@@ -1463,41 +1463,11 @@ setInterval(async()=>{
 /* ── AUTH & USERS ────────────────────────────────────── */
 let currentUser = null;
 
-// SEGURANÇA: login/registro passam por funções RPC no Postgres (SECURITY DEFINER).
-// O hash de senha nunca é lido/exposto pela API pública — a verificação acontece no banco.
-// Ver migração SQL: supabase/auth_rpc.sql
-async function sbEmailExists(email){
-  try{
-    const r=await sbFetch(`app_users?email=eq.${encodeURIComponent(email)}&select=id`);
-    const d=await r.json();return Array.isArray(d)&&d.length>0;
-  }catch(e){return false;}
-}
-async function sbLoginRpc(email,pwHash){
-  try{
-    const r=await sbFetch('rpc/login_user',{method:'POST',
-      body:JSON.stringify({p_email:email,p_hash:pwHash})});
-    if(!r.ok)return null;
-    const d=await r.json();return Array.isArray(d)?(d[0]||null):(d||null);
-  }catch(e){return null;}
-}
-async function sbRegisterRpc(email,name,pwHash){
-  try{
-    const r=await sbFetch('rpc/register_user',{method:'POST',
-      body:JSON.stringify({p_email:email,p_name:name,p_hash:pwHash})});
-    if(!r.ok)return {error:'EMAIL_EXISTS'};
-    const d=await r.json();return {user:Array.isArray(d)?(d[0]||null):(d||null)};
-  }catch(e){return {error:'UNKNOWN'};}
-}
-async function sbUpdateLastLogin(id){
-  try{await sbFetch('rpc/update_last_login',{method:'POST',
-    body:JSON.stringify({p_id:id})});}catch(e){vlWarn('atualizar último login',e);}
-}
-
-// Simple hash (SHA-256 via SubtleCrypto)
-async function hashPw(pw){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
+// Autenticação agora é feita pelo Supabase Auth (ver funções sbAuthRequest /
+// doLogin / doRegister abaixo). As funções RPC antigas (login_user,
+// register_user, update_last_login) e o hash SHA-256 caseiro foram removidos:
+// o Supabase Auth cuida do armazenamento seguro da senha (bcrypt) e emite o
+// token que o RLS usa para reconhecer o usuário.
 
 function showLogin(){
   document.getElementById('loginForm').style.display='block';
@@ -1510,18 +1480,79 @@ function showRegister(){
   document.getElementById('regErr').textContent='';
 }
 
+/* ── AUTENTICAÇÃO VIA SUPABASE AUTH ─────────────────────
+   Antes o login era caseiro (senha verificada por função no banco,
+   sessão só no navegador) — o Supabase não sabia que havia alguém
+   logado, o que tornava impossível proteger os dados com RLS.
+   Agora usamos o Auth nativo: o login devolve um token real, que é
+   enviado em cada requisição e reconhecido pelas políticas de RLS. */
+
+function sbAuthToken(){
+  const s=lsGet('sbSession');
+  if(!s?.access_token)return null;
+  // Se expirou, o refresh acontece em sbRefreshIfNeeded (chamado no boot e periodicamente)
+  return s.access_token;
+}
+
+async function sbAuthRequest(endpoint,body){
+  const r=await fetch(`${SB_URL}/auth/v1/${endpoint}`,{
+    method:'POST',
+    headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(body),
+  });
+  const data=await r.json().catch(()=>({}));
+  return{ok:r.ok,status:r.status,data};
+}
+
+function saveAuthSession(data){
+  const sess={
+    access_token:data.access_token,
+    refresh_token:data.refresh_token,
+    expires_at:Date.now()+((data.expires_in||3600)*1000),
+    user:{
+      id:data.user?.id,
+      email:data.user?.email,
+      name:data.user?.user_metadata?.name||data.user?.email?.split('@')[0]||'Usuário',
+      role:data.user?.user_metadata?.role||'user',
+    },
+  };
+  lsSet('sbSession',sess);
+  currentUser=sess.user;
+  return sess;
+}
+
+async function sbRefreshIfNeeded(){
+  const s=lsGet('sbSession');
+  if(!s?.refresh_token)return false;
+  // Renova se falta menos de 5 minutos para expirar
+  if(s.expires_at&&s.expires_at-Date.now()>5*60*1000){
+    currentUser=s.user;
+    return true;
+  }
+  const{ok,data}=await sbAuthRequest('token?grant_type=refresh_token',{refresh_token:s.refresh_token});
+  if(ok&&data.access_token){saveAuthSession(data);return true;}
+  vlWarn('renovar sessão',data?.error_description||data?.msg||'falha no refresh');
+  lsSet('sbSession',null);
+  return false;
+}
+
 async function doLogin(){
   const email=(document.getElementById('loginEmail')?.value||'').trim().toLowerCase();
   const pass=document.getElementById('loginPass')?.value||'';
   const errEl=document.getElementById('loginErr');
   if(!email||!pass){errEl.textContent='Preencha e-mail e senha.';return;}
   errEl.textContent='Verificando…';
-  const hash=await hashPw(pass);
-  const user=await sbLoginRpc(email,hash);
-  if(!user){errEl.textContent='E-mail ou senha incorretos.';return;}
-  currentUser=user;
-  lsSet('session',{id:user.id,email:user.email,name:user.name,role:user.role});
-  sbUpdateLastLogin(user.id);
+  const{ok,data}=await sbAuthRequest('token?grant_type=password',{email,password:pass});
+  if(!ok||!data.access_token){
+    const msg=(data?.error_description||data?.msg||'').toLowerCase();
+    errEl.textContent=msg.includes('invalid')?'E-mail ou senha incorretos.'
+      :msg.includes('confirm')?'Conta ainda não confirmada. Fale com o administrador.'
+      :'Não foi possível entrar. Tente novamente.';
+    vlWarn('login',data?.error_description||data?.msg||'credenciais inválidas');
+    return;
+  }
+  saveAuthSession(data);
+  errEl.textContent='';
   loginSuccess();
 }
 
@@ -1533,47 +1564,56 @@ async function doRegister(){
   if(!name||!email||!pass){errEl.textContent='Preencha todos os campos.';return;}
   if(pass.length<6){errEl.textContent='Senha deve ter ao menos 6 caracteres.';return;}
   errEl.textContent='Criando conta…';
-  const hash=await hashPw(pass);
-  const result=await sbRegisterRpc(email,name,hash);
-  if(result.error==='EMAIL_EXISTS'){errEl.textContent='E-mail já cadastrado.';return;}
-  if(!result.user){errEl.textContent='Erro ao criar conta. Tente novamente.';return;}
-  const user=result.user;
-  currentUser={...user,name,email,role:'user'};
-  lsSet('session',{id:user.id||'new',email,name,role:'user'});
+  const{ok,data}=await sbAuthRequest('signup',{email,password:pass,data:{name}});
+  if(!ok){
+    const msg=(data?.error_description||data?.msg||data?.message||'').toLowerCase();
+    errEl.textContent=msg.includes('already')?'E-mail já cadastrado.':'Erro ao criar conta: '+(data?.msg||data?.message||'tente novamente');
+    vlWarn('cadastro',data?.msg||data?.message||'falha no signup');
+    return;
+  }
+  if(!data.access_token){
+    // Projeto exige confirmação por e-mail
+    errEl.textContent='Conta criada. Confirme o e-mail antes de entrar.';
+    return;
+  }
+  saveAuthSession(data);
   logActivity('Conta criada','Novo usuário registrado');
   loginSuccess();
 }
 
 function loginSuccess(){
   document.getElementById('loginScreen').style.display='none';
-  // Update sidebar user info
-  const u=currentUser;
+  const u=currentUser||{};
   const avatar=document.getElementById('sbAvatar');
   const uname=document.getElementById('sbUname');
   const urole=document.getElementById('sbUrole');
-  if(avatar) avatar.textContent=(u.name||'?')[0].toUpperCase();
-  if(uname) uname.textContent=u.name||u.email;
+  if(avatar) avatar.textContent=(u.name||u.email||'?')[0].toUpperCase();
+  if(uname) uname.textContent=u.name||u.email||'Usuário';
   if(urole) urole.textContent=u.role==='admin'?'Administrador':'Usuário · RV';
   initApp();
 }
 
-function doLogout(){
+async function doLogout(){
   if(!confirm('Sair da plataforma?'))return;
+  const s=lsGet('sbSession');
+  if(s?.access_token){
+    try{
+      await fetch(`${SB_URL}/auth/v1/logout`,{method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+s.access_token}});
+    }catch(e){vlWarn('logout no servidor',e);}
+  }
   currentUser=null;
+  lsSet('sbSession',null);
   lsSet('session',null);
   document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('loginEmail').value='';
-  document.getElementById('loginPass').value='';
+  const le=document.getElementById('loginEmail');if(le)le.value='';
+  const lp=document.getElementById('loginPass');if(lp)lp.value='';
   showLogin();
 }
 
-function checkSession(){
-  const sess=lsGet('session');
-  if(sess?.id){
-    currentUser=sess;
-    loginSuccess();
-    return true;
-  }
+async function checkSession(){
+  const ok=await sbRefreshIfNeeded();
+  if(ok&&currentUser){loginSuccess();return true;}
   return false;
 }
 
@@ -3905,11 +3945,14 @@ function setSbBadge(status,msg){
 }
 
 async function sbFetch(path,opts={}){
+  // Usa o token da sessão autenticada quando existir (necessário para o RLS
+  // reconhecer o usuário); cai na chave pública apenas para as rotas de auth
+  const token=(typeof sbAuthToken==='function'&&sbAuthToken())||SB_KEY;
   return fetch(`${SB_URL}/rest/v1/${path}`,{
     ...opts,
     headers:{
       'apikey':SB_KEY,
-      'Authorization':'Bearer '+SB_KEY,
+      'Authorization':'Bearer '+token,
       'Content-Type':'application/json',
       ...(opts.headers||{}),
     }
@@ -5646,19 +5689,19 @@ async function initApp(){
   }
 })();
 
-/* ── BOOTSTRAP — inicia direto, sem login ─── */
-(()=>{
-  // Esconde login se existir
-  const ls=document.getElementById('loginScreen');
-  if(ls) ls.style.display='none';
-  // Atualiza sidebar
-  const av=document.getElementById('sbAvatar');
-  const nm=document.getElementById('sbUname');
-  const rl=document.getElementById('sbUrole');
-  if(av) av.textContent='B';
-  if(nm) nm.textContent='Bruno Granito';
-  if(rl) rl.textContent='QA · RV';
+/* ── BOOTSTRAP — exige login real (Supabase Auth) ───────
+   Antes havia um bypass aqui que logava todo mundo automaticamente
+   como "Bruno Granito", ignorando a tela de login. Isso existia porque
+   o login antigo estava quebrado (a consulta não trazia o campo da
+   senha, então nenhuma senha funcionava). Aquele bug já foi corrigido
+   e o login agora usa o Supabase Auth, então o bypass foi removido. */
+(async()=>{
+  const restored=await checkSession();
+  if(!restored){
+    const ls=document.getElementById('loginScreen');
+    if(ls)ls.style.display='flex';
+    showLogin();
+  }
+  // Renova o token periodicamente para a sessão não cair durante o uso
+  setInterval(()=>{sbRefreshIfNeeded().catch(e=>vlWarn('refresh periódico',e));},10*60*1000);
 })();
-currentUser={id:'bruno',email:'bruno.granito@valemobi',name:'Bruno Granito',role:'user'};
-lsSet('session',currentUser);
-initApp();
