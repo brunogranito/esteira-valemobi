@@ -2556,16 +2556,26 @@ function collectOverdueReminders(){
   return out.sort((a,b)=>b.when-a.when);
 }
 
+let _digestItems=[];   // itens do resumo atual, com estado de "visto"
+
 function showWelcomeDigest(){
   const overdue=collectOverdueReminders();
   const mentions=getPendingMentions();
   if(!overdue.length&&!mentions.length)return;
 
-  // Não repete o resumo se já foi mostrado nas últimas 4 horas
+  // Não repete o resumo se já foi confirmado nas últimas 4 horas
   const lastShown=lsGet('digestShownTs')||0;
   if(Date.now()-lastShown<4*60*60*1000)return;
-  lsSet('digestShownTs',Date.now());
 
+  // Monta a lista com um id próprio por item, para marcar "visto" individualmente
+  _digestItems=[
+    ...overdue.map((o,i)=>({...o,_id:'ov'+i,_type:'overdue',seen:false})),
+    ...mentions.map((m,i)=>({...m,_id:'mn'+i,_type:'mention',seen:false})),
+  ];
+  renderWelcomeDigest();
+}
+
+function renderWelcomeDigest(){
   const fmt=d=>{
     const diffDays=Math.floor((Date.now()-d.getTime())/86400000);
     const hora=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -2579,40 +2589,99 @@ function showWelcomeDigest(){
     overlay=document.createElement('div');
     overlay.id='digestOverlay';
     overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:6000;display:flex;align-items:center;justify-content:center;padding:20px';
-    overlay.addEventListener('click',e=>{if(e.target===overlay)closeWelcomeDigest();});
+    // Clicar fora NÃO fecha: o resumo só sai quando o usuário confirma,
+    // para não perder itens de vista ao abrir um card no meio da lista
     document.body.appendChild(overlay);
   }
 
-  const total=overdue.length+mentions.length;
+  const pending=_digestItems.filter(i=>!i.seen);
+  const seenCount=_digestItems.length-pending.length;
+  const overdueItems=_digestItems.filter(i=>i._type==='overdue');
+  const mentionItems=_digestItems.filter(i=>i._type==='mention');
+
+  const itemHtml=(it)=>{
+    const isMention=it._type==='mention';
+    const action=isMention
+      ? `openModal('${it.pid}');setTimeout(()=>sw('cmt'),150)`
+      : (it.pid==='__standalone__'?`openTasksPanel()`:`openModal('${it.pid}')`);
+    const border=isMention?'rgba(128,103,176,.25)':'rgba(85,86,106,.22)';
+    const bg=isMention?'rgba(128,103,176,.08)':'rgba(255,255,255,.03)';
+    const leftBar=isMention?'':'border-left:3px solid #D98E3F;';
+    return`<div style="display:flex;align-items:flex-start;gap:9px;background:${bg};border:1px solid ${border};${leftBar}border-radius:7px;padding:9px 11px;margin-bottom:6px;${it.seen?'opacity:.45;':''}transition:opacity .2s">
+      <button onclick="toggleDigestSeen('${it._id}')" title="${it.seen?'Desmarcar':'Marcar como visto'}"
+        style="flex-shrink:0;width:18px;height:18px;margin-top:1px;border-radius:4px;cursor:pointer;border:1.5px solid ${it.seen?'#7A9B6B':'rgba(139,141,155,.5)'};background:${it.seen?'#7A9B6B':'transparent'};color:#14151F;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">${it.seen?'✓':''}</button>
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="openFromDigest('${it._id}')">
+        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px;${it.seen?'text-decoration:line-through':''}">${it.pname}</div>
+        ${isMention
+          ? `<div style="font-size:10px;color:#8B8D9B">${it.author}: "${(it.text||'').slice(0,70)}${(it.text||'').length>70?'…':''}"</div>`
+          : `<div style="font-size:11px;color:#A5A7B8;line-height:1.35">${it.text}</div>
+             <div style="font-size:9px;color:#55566A;margin-top:3px">venceu ${fmt(it.when)}</div>`}
+      </div>
+    </div>`;
+  };
+
   overlay.innerHTML=`<div style="background:#1C1D28;border:1px solid rgba(85,86,106,.35);border-radius:14px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 56px rgba(0,0,0,.6);overflow:hidden">
     <div style="padding:18px 22px 14px;border-bottom:1px solid rgba(85,86,106,.25)">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#EDEDF0;margin-bottom:3px">👋 Enquanto você esteve fora</div>
-      <div style="font-size:11px;color:#8B8D9B">${total} ${total===1?'item precisa':'itens precisam'} da sua atenção</div>
+      <div style="font-size:11px;color:#8B8D9B">
+        ${pending.length?`${pending.length} ${pending.length===1?'item pendente':'itens pendentes'}`:'Tudo revisado!'}
+        ${seenCount?` · <span style="color:#7A9B6B">${seenCount} visto${seenCount>1?'s':''}</span>`:''}
+      </div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:14px 22px">
-      ${overdue.length?`<div style="font-size:9px;font-weight:700;color:#E2A968;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🔔 Lembretes que venceram (${overdue.length})</div>
-      ${overdue.slice(0,12).map(o=>`<div onclick="closeWelcomeDigest();${o.pid==='__standalone__'?'openTasksPanel()':`openModal('${o.pid}')`}" style="background:rgba(255,255,255,.03);border:1px solid rgba(85,86,106,.22);border-left:3px solid #D98E3F;border-radius:7px;padding:9px 11px;margin-bottom:6px;cursor:pointer">
-        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px">${o.pname}</div>
-        <div style="font-size:11px;color:#A5A7B8;line-height:1.35">${o.text}</div>
-        <div style="font-size:9px;color:#55566A;margin-top:3px">venceu ${fmt(o.when)}</div>
-      </div>`).join('')}
-      ${overdue.length>12?`<div style="font-size:10px;color:#55566A;text-align:center;padding:4px 0 8px">+ ${overdue.length-12} outros — veja no sino 🔔</div>`:''}`:''}
-      ${mentions.length?`<div style="font-size:9px;font-weight:700;color:#B9A6D9;text-transform:uppercase;letter-spacing:.6px;margin:${overdue.length?'14px':'0'} 0 8px">💬 Menções para você (${mentions.length})</div>
-      ${mentions.slice(0,6).map(m=>`<div onclick="closeWelcomeDigest();openModal('${m.pid}');setTimeout(()=>sw('cmt'),150)" style="background:rgba(128,103,176,.08);border:1px solid rgba(128,103,176,.25);border-radius:7px;padding:9px 11px;margin-bottom:6px;cursor:pointer">
-        <div style="font-size:11px;font-weight:600;color:#EDEDF0;margin-bottom:2px">${m.pname}</div>
-        <div style="font-size:10px;color:#8B8D9B">${m.author}: "${(m.text||'').slice(0,70)}${(m.text||'').length>70?'…':''}"</div>
-      </div>`).join('')}`:''}
+    <div id="digestList" style="flex:1;overflow-y:auto;padding:14px 22px">
+      ${overdueItems.length?`<div style="font-size:9px;font-weight:700;color:#E2A968;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🔔 Lembretes que venceram (${overdueItems.filter(i=>!i.seen).length}/${overdueItems.length})</div>
+      ${overdueItems.map(itemHtml).join('')}`:''}
+      ${mentionItems.length?`<div style="font-size:9px;font-weight:700;color:#B9A6D9;text-transform:uppercase;letter-spacing:.6px;margin:${overdueItems.length?'14px':'0'} 0 8px">💬 Menções para você (${mentionItems.filter(i=>!i.seen).length}/${mentionItems.length})</div>
+      ${mentionItems.map(itemHtml).join('')}`:''}
     </div>
-    <div style="padding:14px 22px;border-top:1px solid rgba(85,86,106,.25);display:flex;gap:8px">
-      <button onclick="closeWelcomeDigest()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Entendi, vamos lá</button>
+    <div style="padding:14px 22px;border-top:1px solid rgba(85,86,106,.25);display:flex;gap:8px;align-items:center">
+      <button onclick="markAllDigestSeen()" style="background:none;border:1px solid rgba(85,86,106,.4);color:#8B8D9B;padding:10px 14px;border-radius:8px;font-size:11px;cursor:pointer;white-space:nowrap">Marcar todos</button>
+      <button onclick="confirmWelcomeDigest()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+        ${pending.length?`Fechar (${pending.length} pendente${pending.length>1?'s':''})`:'Concluir'}
+      </button>
     </div>
   </div>`;
   overlay.style.display='flex';
 }
-function closeWelcomeDigest(){
+
+function toggleDigestSeen(id){
+  const it=_digestItems.find(x=>x._id===id);
+  if(!it)return;
+  it.seen=!it.seen;
+  renderWelcomeDigest();
+}
+function markAllDigestSeen(){
+  _digestItems.forEach(i=>{i.seen=true;});
+  renderWelcomeDigest();
+}
+// Abre o card/tarefa do item, marca como visto, e ESCONDE o resumo
+// temporariamente — ele volta sozinho quando o card for fechado
+function openFromDigest(id){
+  const it=_digestItems.find(x=>x._id===id);
+  if(!it)return;
+  it.seen=true;
+  const overlay=document.getElementById('digestOverlay');
+  if(overlay)overlay.style.display='none';
+  if(it._type==='mention'){openModal(it.pid);setTimeout(()=>sw('cmt'),150);}
+  else if(it.pid==='__standalone__'){openTasksPanel();}
+  else {openModal(it.pid);}
+  _digestWaitingReturn=true;
+}
+let _digestWaitingReturn=false;
+// Traz o resumo de volta quando o usuário fecha o card/painel que abriu a partir dele
+function maybeReopenDigest(){
+  if(!_digestWaitingReturn)return;
+  _digestWaitingReturn=false;
+  if(_digestItems.some(i=>!i.seen))renderWelcomeDigest();
+  else lsSet('digestShownTs',Date.now());
+}
+function confirmWelcomeDigest(){
+  lsSet('digestShownTs',Date.now());
+  _digestWaitingReturn=false;
   const o=document.getElementById('digestOverlay');
   if(o)o.style.display='none';
 }
+function closeWelcomeDigest(){confirmWelcomeDigest();}
 
 /* ── MENÇÕES (@nome nos comentários) ─────────────────── */
 function isMentioned(text){
@@ -3482,7 +3551,7 @@ const _tpCards={};
 function openTasksPanel(){
   document.getElementById('tasksPanelOverlay').classList.add('open');renderTasksPanel();
 }
-function closeTasksPanel(){document.getElementById('tasksPanelOverlay').classList.remove('open');}
+function closeTasksPanel(){document.getElementById('tasksPanelOverlay').classList.remove('open');maybeReopenDigest();}
 function toggleTpSection(sec){_tpExpanded[sec]=!_tpExpanded[sec];renderTasksPanel();}
 function toggleTpCard(pid){_tpCards[pid]=!(_tpCards[pid]??false);renderTasksPanel();}
 
@@ -4710,7 +4779,7 @@ function openModal(id){
   document.getElementById("modalBg").classList.add("open");
   renderModal();
 }
-function closeModal(){document.getElementById("modalBg").classList.remove("open");selId=null;}
+function closeModal(){document.getElementById("modalBg").classList.remove("open");selId=null;maybeReopenDigest();}
 
 function renderModal(){
   const p=getP(selId);if(!p)return;
