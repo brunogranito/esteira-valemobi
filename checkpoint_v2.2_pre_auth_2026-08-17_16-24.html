@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Esteira Valemobi — RV · v2.2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+
+<!-- API KEY SETUP MODAL -->
+<div id="apiSetup">
+  <div class="setup-box">
+    <div class="setup-logo">⚡</div>
+    <div class="setup-title">Configurar Assistente IA</div>
+    <div class="setup-sub">
+      Para usar o assistente Claude integrado, você precisa de uma chave de API da Anthropic.<br><br>
+      👉 <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> → API Keys → Create Key<br><br>
+      Custo estimado: <strong style="color:#EDEDF0">menos de R$5/mês</strong> para uso pessoal.
+      A chave fica salva no seu browser (localStorage) e não é enviada a ninguém além da Anthropic.
+    </div>
+    <label class="setup-label">Sua chave de API Anthropic</label>
+    <input class="setup-input" id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." autocomplete="off">
+    <div class="setup-hint">A chave começa com <code style="color:#D98E3F">sk-ant-</code>. Ela fica guardada apenas no seu navegador.</div>
+    <div class="setup-err" id="setupErr">Chave inválida. Deve começar com sk-ant-</div>
+    <button class="setup-btn" onclick="saveApiKey()">Salvar e continuar</button>
+    <div class="setup-skip" onclick="skipApiKey()">Pular por agora — usar sem assistente IA</div>
+  </div>
+</div>
+
+<!-- APP -->
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">⚡</div>
+    <div class="login-title">Esteira Valemobi</div>
+    <div class="login-sub">Plataforma de Gestão de Projetos — RV</div>
+    <div id="loginForm">
+      <label class="login-lbl">E-mail</label>
+      <input class="login-inp" id="loginEmail" type="email" placeholder="seu@valemobi.com.br"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <label class="login-lbl">Senha</label>
+      <input class="login-inp" id="loginPass" type="password" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">Entrar</button>
+      <div class="login-err" id="loginErr"></div>
+      <div class="login-toggle">Não tem conta? <span onclick="showRegister()">Criar conta</span></div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <label class="login-lbl">Nome completo</label>
+      <input class="login-inp" id="regName" placeholder="Seu nome">
+      <label class="login-lbl">E-mail</label>
+      <input class="login-inp" id="regEmail" type="email" placeholder="seu@valemobi.com.br">
+      <label class="login-lbl">Senha (mín. 6 caracteres)</label>
+      <input class="login-inp" id="regPass" type="password" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="login-btn" onclick="doRegister()">Criar conta</button>
+      <div class="login-err" id="regErr"></div>
+      <div class="login-toggle">Já tem conta? <span onclick="showLogin()">Entrar</span></div>
+    </div>
+  </div>
+</div>
+
+<button class="tv-exit-btn" onclick="exitTvMode()">✕ Sair do Modo TV</button>
+<div class="tv-clock" id="tvClock"></div>
+
+<!-- BARRA DE ACESSOS RÁPIDOS (oculta, aparece ao passar o mouse no rodapé) -->
+<div class="quickbar-zone" id="quickbarZone" onmouseenter="_menuCancelClose()" onmouseleave="_menuScheduleClose()">
+  <div class="quickbar-hint"></div>
+  <div class="quickbar-dock">
+    <button class="quickbar-item" onclick="openMenuPanel('sistemas',this)"><span class="quickbar-item-icon">🖥</span>Sistemas</button>
+    <button class="quickbar-item" onclick="openMenuPanel('pessoas',this)"><span class="quickbar-item-icon">👤</span>Pessoas</button>
+    <button class="quickbar-item" onclick="openMenuPanel('templates',this)"><span class="quickbar-item-icon">📋</span>Templates</button>
+  </div>
+</div>
+
+<!-- LEFT SIDEBAR -->
+<div id="sidebarOverlay" onclick="closeSidebar()"></div>
+<div id="leftSidebar">
+  <div class="sb-top">
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">?</div>
+      <div>
+        <div class="sb-uname" id="sbUname">Carregando…</div>
+        <div class="sb-urole" id="sbUrole"></div>
+      </div>
+      <button class="sb-logout" onclick="doLogout()" title="Sair">⏻</button>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Principal</div>
+    <div class="sb-item" onclick="openTasksPanel();closeSidebar()"><span class="sb-item-icon">📋</span>Tarefas</div>
+    <div class="sb-item" onclick="openBriefing();closeSidebar()"><span class="sb-item-icon">☀️</span>Briefing do Dia</div>
+    <div class="sb-item" onclick="openAgenda();closeSidebar()"><span class="sb-item-icon">📅</span>Agenda</div>
+    <div class="sb-item" onclick="openReportsPanel();closeSidebar()"><span class="sb-item-icon">📊</span>Relatórios</div>
+    <div class="sb-section">Integrações</div>
+    <div class="sb-item" onclick="openJiraPanel();closeSidebar()"><span class="sb-item-icon">🔗</span>Jira</div>
+    <div class="sb-item" onclick="openMsConfig();closeSidebar()"><span class="sb-item-icon">🪟</span>Microsoft 365</div>
+    <div class="sb-item" onclick="openSettings();closeSidebar()"><span class="sb-item-icon">🔑</span>API Key (Claude)</div>
+    <div class="sb-section">Sistema</div>
+    <div class="sb-item" id="sbLogsItem" onclick="openLogs();closeSidebar()"><span class="sb-item-icon">📋</span>Logs de Atividade<span class="sb-badge-count" id="sbLogCount">…</span></div>
+    <div class="sb-item" onclick="openTrashPanel();closeSidebar()"><span class="sb-item-icon">🗑</span>Lixeira<span class="sb-badge-count" id="trashCount" style="display:none">0</span></div>
+    <div class="sb-item" onclick="toggleTheme()"><span class="sb-item-icon" id="sbThemeIcon">🌙</span>Alternar Tema</div>
+  </nav>
+</div>
+
+<div class="app">
+  <div class="app-hd">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="sidebar-toggle" onclick="openSidebar()" title="Menu">☰</button>
+      <div>
+        <div class="app-title">⚡ Esteira Valemobi — RV</div>
+        <div class="app-sub">Arraste cards entre stages • Clique para Info + Checklist + IA · <span style="color:#55566A">v2.2</span></div>
+      </div>
+    </div>
+    <!-- MULTI-SELECT BAR -->
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-info" id="bulkInfo">0 selecionados</span>
+      <select class="bulk-stage-sel" id="bulkStage">
+        <option value="">Mover para stage…</option>
+      </select>
+      <button class="bulk-btn" style="background:rgba(217,142,63,.2);border-color:rgba(217,142,63,.4);color:#E2A968" onclick="bulkMove()">Mover</button>
+      <button class="bulk-btn" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#f87171" onclick="bulkArchive()">Arquivar</button>
+      <button class="bulk-btn" style="background:rgba(85,86,106,.2);border-color:rgba(85,86,106,.4);color:#A5A7B8" onclick="clearSelection()">✕ Cancelar</button>
+    </div>
+    <div class="hd-right">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-bar" id="searchBar" type="search" placeholder="Buscar em toda a plataforma…"
+          oninput="globalSearch(this.value)"
+          onkeydown="if(event.key==='Escape'){this.value='';closeSearch();}"
+          autocomplete="off" spellcheck="false">
+      </div>
+      <div class="stat-row" id="stats"></div>
+      <div class="sb-badge syncing" id="sbBadge" title="Status da sincronização com Supabase">
+        <div class="sb-dot pulse"></div><span id="sbLabel">Conectando…</span>
+      </div>
+      <div class="bell-wrap">
+        <button class="bell-btn" id="bellBtn" onclick="openNotifSidebar()" title="Lembretes">🔔</button>
+        <span class="bell-count" id="bellCount" style="display:none">0</span>
+      </div>
+      <button onclick="openAddCardModal()" title="Adicionar novo card" style="background:rgba(217,142,63,.15);border:1px solid rgba(217,142,63,.35);color:#E2A968;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">+ Card</button>
+  <button class="arch-badge" id="archBadge" onclick="toggleArchived()">📦 0 arquivados</button>
+    </div>
+  </div>
+  <div id="archPanel" style="display:none">
+    <div class="arch-panel">
+      <div class="arch-panel-title">📦 Demandas Arquivadas</div>
+      <div id="archList"></div>
+    </div>
+  </div>
+  <div class="view-toggle">
+    <button class="vt-btn active" id="vtKanban" onclick="setBoardView('kanban')" title="Visão Kanban">▦ Kanban</button>
+    <button class="vt-btn" id="vtTable" onclick="setBoardView('table')" title="Visão em Tabela">☰ Tabela</button>
+    <span style="flex:1"></span>
+    <button class="vt-btn" onclick="exportCSV()" title="Exportar todas as demandas para CSV">⬇ Exportar CSV</button>
+    <button class="vt-btn" onclick="document.getElementById('csvFileInput').click()" title="Importar demandas de um arquivo CSV">⬆ Importar CSV</button>
+    <button class="vt-btn" onclick="enterTvMode()" title="Modo apresentação (somente leitura, tela cheia)">🖥 Modo TV</button>
+    <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCsvFile(this.files[0])">
+  </div>
+  <div class="kb" id="board"></div>
+  <div id="tableView" style="display:none"></div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-bg" id="modalBg" onmousedown="_ovMD=(event.target===this)">
+  <div class="modal">
+    <div class="mhd">
+      <div class="mhd-top">
+        <div>
+          <div class="mcode" id="mCode"></div>
+          <div class="mname" id="mName"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="card-bell-btn" id="modalBell" onclick="toggleCardReminder(selId)" title="Lembrete do card" style="position:static;opacity:.55;font-size:15px;padding:4px 6px;border-radius:6px;border:1px solid rgba(85,86,106,.3)">🔕</button>
+          <button class="close-btn" onclick="closeModal()">×</button>
+        </div>
+      </div>
+      <div class="mmeta" id="mMeta"></div>
+      <div style="font-size:10px;color:#8B8D9B;margin-bottom:5px">Progresso: <span id="mPct">0</span>%</div>
+      <div class="pb2"><div class="pb2-f" id="mBar" style="width:0%"></div></div>
+      <div style="font-size:10px;color:#8B8D9B;margin-bottom:6px">Mover para:</div>
+      <div class="stage-pills" id="mStages"></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="sw('info')">Informações</button>
+      <button class="tab" onclick="sw('check')">✓ Checklist</button>
+      <button class="tab" onclick="sw('cmt')">💬 Comentários</button>
+      <button class="tab" onclick="sw('ia')">✦ IA</button>
+      <button class="tab" onclick="sw('jira')">🔗 Jira</button>
+      <button class="tab" onclick="sw('mtg')">📝 Reuniões</button>
+      <button class="tab" onclick="sw('dep')">🔗 Depend.</button>
+    </div>
+    <div class="mbody">
+      <div id="tInfo"></div>
+      <div id="tCmt" style="display:none"></div>
+      <div id="tCheck" style="display:none"></div>
+      <div id="tIa" style="display:none"></div>
+      <div id="tJira" style="display:none"></div>
+      <div id="tMtg" style="display:none"></div>
+      <div id="tDep" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MENU PANEL -->
+<div class="utility-window" id="menuOverlay" onmouseenter="_menuCancelClose()" onmouseleave="_menuScheduleClose()">
+  <div class="utility-window-hd">
+    <div class="utility-window-title" id="menuWindowTitle">📚 Referências e Acessos</div>
+    <div class="utility-window-actions">
+      <button onclick="minimizeMenuPanel()" title="Minimizar">–</button>
+      <button onclick="closeMenuPanel()" title="Fechar">×</button>
+    </div>
+  </div>
+  <div class="panel-tabs" id="menuTabs"></div>
+  <div class="panel-body" id="menuBody"></div>
+</div>
+
+<!-- REPORTS PANEL -->
+<div class="panel-overlay" id="rptOverlay" onclick="if(event.target===this)closeReportsPanel()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">📊 Relatórios — Esteira RV</div>
+      <button class="close-btn" onclick="closeReportsPanel()">×</button>
+    </div>
+    <div class="panel-body" id="rptBody"></div>
+  </div>
+</div>
+
+<!-- BRIEFING PANEL -->
+<div class="panel-overlay" id="briefingOverlay" onclick="if(event.target===this)closeBriefing()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div>
+        <div class="panel-title">☀️ Briefing do Dia</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px" id="briefingDate"></div>
+      </div>
+      <button class="close-btn" onclick="closeBriefing()">×</button>
+    </div>
+    <div class="panel-body" id="briefingBody">
+      <div class="jira-loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div> Gerando briefing com IA…</div>
+    </div>
+  </div>
+</div>
+
+<!-- AGENDA PANEL -->
+<div class="panel-overlay" id="agendaOverlay" onclick="if(event.target===this)closeAgenda()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">📅 Agenda — Datas e Marcos</div>
+      <button class="close-btn" onclick="closeAgenda()">×</button>
+    </div>
+    <div class="panel-body" id="agendaBody"></div>
+  </div>
+</div>
+
+<!-- MICROSOFT CONFIG PANEL -->
+<div class="panel-overlay" id="msOverlay" onclick="if(event.target===this)closeMsConfig()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">🪟 Microsoft 365 — Configuração</div>
+      <button class="close-btn" onclick="closeMsConfig()">×</button>
+    </div>
+    <div class="panel-body" id="msBody"></div>
+  </div>
+</div>
+
+<!-- ACTIVITY LOGS PANEL -->
+<div class="panel-overlay" id="logsOverlay" onclick="if(event.target===this)closeLogs()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">📋 Logs de Atividade</div>
+      <button class="close-btn" onclick="closeLogs()">×</button>
+    </div>
+    <div class="panel-body" id="logsBody"></div>
+  </div>
+</div>
+
+<!-- TRASH PANEL -->
+<div class="panel-overlay" id="trashOverlay" onclick="if(event.target===this)closeTrashPanel()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">🗑 Lixeira</div>
+      <button class="close-btn" onclick="closeTrashPanel()">×</button>
+    </div>
+    <div class="panel-body" id="trashBody"></div>
+  </div>
+</div>
+
+<!-- JIRA PANEL -->
+<div class="panel-overlay" id="jiraOverlay" onclick="if(event.target===this)closeJiraPanel()">
+  <div class="side-panel">
+    <div class="panel-hd">
+      <div class="panel-title">🔗 Jira — Importar & Configurar</div>
+      <button class="close-btn" onclick="closeJiraPanel()">×</button>
+    </div>
+    <div class="panel-tabs" id="jiraTabs"></div>
+    <div class="panel-body" id="jiraBody"></div>
+  </div>
+</div>
+
+<!-- LINK MODAL -->
+<div class="link-modal" id="linkModal" onclick="if(event.target===this)closeLinkModal()">
+  <div class="link-box">
+    <h4>➕ Adicionar Link</h4>
+    <input class="link-inp" id="linkName" placeholder="Nome do link (ex: BAPG-1503, TFS, Figma…)" maxlength="60">
+    <input class="link-inp" id="linkUrl" placeholder="URL (ex: https://valemobi.atlassian.net/…)">
+    <div class="link-sugg-wrap" style="margin-bottom:10px">
+      <div class="link-sugg-hd" id="linkSuggHd" onclick="toggleLinkSugg()">
+        💡 Sugestões de links <span>▼</span>
+      </div>
+      <div class="link-sugg-body open" id="linkSuggBody">
+        <div style="padding:6px 8px;border-bottom:1px solid rgba(85,86,106,.15)">
+          <input id="linkSuggSearch" placeholder="🔍 Filtrar sugestões…"
+            style="width:100%;background:rgba(20,21,31,.6);border:1px solid rgba(85,86,106,.25);color:#EDEDF0;padding:5px 9px;border-radius:5px;font-size:11px;outline:none"
+            oninput="filterLinkSugg(this.value)">
+        </div>
+        <div id="linkSuggList" style="max-height:180px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <button class="link-save-btn" onclick="saveLinkModal()">Adicionar</button>
+    <button class="link-cancel-btn" onclick="closeLinkModal()">Cancelar</button>
+  </div>
+</div>
+
+<div id="searchResults"></div>
+<div class="reminder-alert" id="reminderAlert">
+  <div class="reminder-box">
+    <div class="reminder-icon">🔔</div>
+    <div class="reminder-title">Lembrete!</div>
+    <div class="reminder-project" id="reminderAlertProject"></div>
+    <div class="reminder-text" id="reminderAlertText"></div>
+    <div class="reminder-btns">
+      <button class="reminder-dismiss" onclick="dismissReminderAlert()">✓ Dispensar</button>
+      <button class="reminder-open" id="reminderAlertOpen">Abrir card →</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION SIDEBAR -->
+<div id="notifSidebarOverlay" onclick="closeNotifSidebar()" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:499;display:none"></div>
+<div id="notifSidebar" style="position:fixed;right:-340px;top:0;width:320px;height:100vh;background:#15161F;border-left:1px solid rgba(85,86,106,.3);z-index:500;transition:right .25s ease;display:flex;flex-direction:column;box-shadow:-4px 0 20px rgba(0,0,0,.5)">
+  <div style="padding:16px 18px;border-bottom:1px solid rgba(85,86,106,.2);background:linear-gradient(90deg,#2E2013,#1C1710);flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:14px;font-weight:700;color:#EDEDF0">🔔 Lembretes</div>
+    <button onclick="closeNotifSidebar()" style="background:none;border:none;color:#8B8D9B;font-size:20px;cursor:pointer;padding:2px 6px">×</button>
+  </div>
+  <div id="notifSidebarBody" style="flex:1;overflow-y:auto;padding:12px 14px"></div>
+</div>
+
+<!-- ADD CARD MODAL -->
+<div id="addCardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1C1D28;border:1px solid rgba(85,86,106,.3);border-radius:12px;padding:24px;width:min(440px,100%);box-shadow:0 12px 32px rgba(0,0,0,.7)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#EDEDF0">➕ Novo Card</div>
+      <button onclick="toggleAiCreate()" id="ncAiToggle" style="background:rgba(128,103,176,.15);border:1px solid rgba(128,103,176,.4);color:#B9A6D9;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">✨ Criar com IA</button>
+    </div>
+    <div id="ncAiBox" style="display:none;margin-bottom:14px;padding:10px;background:rgba(128,103,176,.08);border:1px solid rgba(128,103,176,.25);border-radius:8px">
+      <textarea id="ncAiInput" placeholder="Descreva em texto livre. Ex: Custódia Remunerada, alta prioridade, dev João, RDM dia 20/09, já em QA" style="width:100%;min-height:52px;background:rgba(20,21,31,.6);border:1px solid rgba(85,86,106,.35);color:#EDEDF0;border-radius:6px;padding:7px 9px;font-size:11px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <span id="ncAiStatus" style="font-size:10px;color:#8B8D9B"></span>
+        <button onclick="interpretCardAI()" style="background:linear-gradient(90deg,#8067B0,#6B5590);border:none;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Interpretar</button>
+      </div>
+    </div>
+    <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Nome da demanda *</label>
+    <input id="ncName" class="mef-inp" placeholder="Ex: Custódia Remunerada" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+    <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Código Jira</label>
+    <input id="ncCode" class="mef-inp" placeholder="Ex: BAPG-1234" style="width:100%;margin-bottom:10px;box-sizing:border-box">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Owner</label>
+        <input id="ncOwner" class="mef-inp" list="pplListNc" placeholder="Responsável" style="width:100%;box-sizing:border-box">
+        <datalist id="pplListNc"></datalist>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Dev</label>
+        <input id="ncDev" class="mef-inp" list="pplListNc" placeholder="Desenvolvedor" style="width:100%;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">RDM (opcional)</label>
+        <input id="ncRmd" class="mef-inp" placeholder="dd/mm/aaaa" style="width:100%;box-sizing:border-box">
+      </div>
+      <div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Stage inicial</label>
+        <select id="ncStage" style="width:100%;background:rgba(20,21,31,.8);border:1px solid rgba(85,86,106,.3);color:#EDEDF0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box">
+          <option value="escopo">📋 Escopo</option>
+          <option value="aguardando">⏳ Ag. Aprovação de Horas</option>
+          <option value="descoberta">🔍 Descob./Refin.</option>
+          <option value="dev">⚙ Dev</option>
+          <option value="qa" selected>✅ QA</option>
+          <option value="homolog">🏗 Homologação</option>
+          <option value="rdm">🚀 RDM</option>
+          <option value="posrdm">📊 Pós-RDM</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:#8B8D9B;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Prioridade</label>
+        <select id="ncPrio" style="width:100%;background:rgba(20,21,31,.8);border:1px solid rgba(85,86,106,.3);color:#EDEDF0;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box">
+          <option value="normal">Normal</option>
+          <option value="high">🟠 Alta</option>
+          <option value="urgent">🔴 Urgente</option>
+          <option value="low">Baixa</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmAddCard()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Criar card</button>
+      <button onclick="closeAddCardModal()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.3);color:#8B8D9B;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
+  </div>
+</div>
+<div id="csvImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1C1D28;border:1px solid rgba(85,86,106,.3);border-radius:12px;padding:24px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.7)">
+    <div style="font-size:15px;font-weight:700;color:#EDEDF0;margin-bottom:6px">⬆ Importar CSV</div>
+    <div id="csvImportSummary" style="font-size:11px;color:#8B8D9B;margin-bottom:12px"></div>
+    <div id="csvImportList" style="flex:1;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:5px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmCsvImport()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:10px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">Confirmar importação</button>
+      <button onclick="closeCsvImportModal()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.3);color:#8B8D9B;padding:10px;border-radius:7px;font-size:13px;cursor:pointer">Cancelar</button>
+    </div>
+  </div>
+</div>
+<!-- TASKS PANEL -->
+<div class="panel-overlay" id="tasksPanelOverlay" onclick="if(event.target===this)closeTasksPanel()" style="align-items:stretch;justify-content:flex-end">
+  <div style="width:min(480px,100vw);height:100vh;background:#0c1829;display:flex;flex-direction:column;border-left:1px solid rgba(85,86,106,.3);box-shadow:-4px 0 24px rgba(0,0,0,.5)">
+    <div class="panel-hd" style="flex-shrink:0">
+      <div><div class="panel-title">📋 Tarefas</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Visão unificada de todas as tarefas</div></div>
+      <button class="close-btn" onclick="closeTasksPanel()">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 14px" id="tasksPanelBody"></div>
+  </div>
+</div>
+<div id="atDropdown"></div>
+<div id="toastWrap"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
