@@ -5873,24 +5873,40 @@ async function initApp(){
       timeout.then(()=>{throw new Error('timeout');})
     ]);
 
-    // Guarda a versão que acabamos de carregar — é a referência usada para
-    // detectar se alguém alterou os dados antes do nosso próximo salvamento
-    Promise.all([sbGetMeta('projects'),sbGetMeta('orders')]).then(([vp,vo])=>{
-      noteRemoteVersion('projects',vp);
-      noteRemoteVersion('orders',vo);
-    }).catch(()=>{});
-
     let updated=false;
+    let projectsRewritten=false, ordersRewritten=false;
     if(sbProjects?.length){
       projects=sbProjects;lsSet('projects',projects);updated=true;
     } else if(projects.length){
-      sbSet('projects',projects).catch(()=>{});
+      // Sem isto, um GET que falhou (ex: erro HTTP momentâneo) fazia esta
+      // gravação de recuperação escrever no servidor sem nunca atualizar a
+      // 'versão conhecida' — toda gravação seguinte na sessão detectava um
+      // conflito permanente e falso, mesmo sem ninguém mais editando.
+      projectsRewritten=true;
+      const stamp=new Date().toISOString();
+      sbSet('projects',projects,stamp).then(ok=>{if(ok)noteRemoteVersion('projects',stamp);}).catch(()=>{});
     }
 
     if(sbOrders&&Object.keys(sbOrders).length){
       stageOrders=sbOrders;lsSet('orders',stageOrders);
     } else if(Object.keys(stageOrders).length){
-      sbSet('orders',stageOrders).catch(()=>{});
+      ordersRewritten=true;
+      const stamp=new Date().toISOString();
+      sbSet('orders',stageOrders,stamp).then(ok=>{if(ok)noteRemoteVersion('orders',stamp);}).catch(()=>{});
+    }
+
+    // Guarda a versão "vigente" — mas só para as chaves que NÃO acabamos de
+    // reescrever agora mesmo acima. Se buscássemos para as duas sempre, essa
+    // busca (mais lenta) podia responder DEPOIS da gravação de recuperação e
+    // sobrescrever a versão correta com uma desatualizada — reabrindo o
+    // mesmo problema de conflito permanente que a correção acima resolve.
+    const metaKeys=[];
+    if(!projectsRewritten)metaKeys.push('projects');
+    if(!ordersRewritten)metaKeys.push('orders');
+    if(metaKeys.length){
+      Promise.all(metaKeys.map(k=>sbGetMeta(k))).then(vals=>{
+        metaKeys.forEach((k,i)=>noteRemoteVersion(k,vals[i]));
+      }).catch(()=>{});
     }
 
     if(sbJiraCfg){
