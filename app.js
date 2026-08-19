@@ -1452,11 +1452,18 @@ setInterval(async()=>{
     const serverVersion=await sbGetMeta('projects');
     if(!serverVersion)return;
     if(remoteVersions['projects']&&serverVersion===remoteVersions['projects'])return; // nada mudou
+    if(_ownWrites.has(serverVersion)){ // fomos nós que gravamos: só alinha e sai
+      noteRemoteVersion('projects',serverVersion);
+      return;
+    }
     const remote=await sbGet('projects');
     if(remote?.length){
       projects=remote;lsSet('projects',projects);
       noteRemoteVersion('projects',serverVersion);
-      renderBoard();renderStats();
+      // Renderiza sem permitir que getOrder() grave — senão essa gravação
+      // mudaria a versão no servidor e realimentaria este mesmo polling
+      _suppressOrderSave=true;
+      try{renderBoard();renderStats();}finally{_suppressOrderSave=false;}
       const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
       setSbBadge('synced',`☁ Atualizado às ${now} <span class="sync-dot active"></span>`);
     }
@@ -4138,6 +4145,7 @@ async function sbSet(id,value,ts){
       body:JSON.stringify({id,value,updated_at:stamp})
     });
     if(!r.ok)vlWarn(`salvar '${id}' no Supabase`,`HTTP ${r.status}`);
+    if(r.ok)noteOwnWrite(stamp); // marca como trabalho desta sessão
     return r.ok?stamp:false;
   }catch(e){vlWarn(`salvar '${id}' no Supabase`,e);return false;}
 }
@@ -4151,6 +4159,19 @@ async function sbSet(id,value,ts){
    em que a carregamos. Antes de salvar, conferimos se o servidor ainda
    está nessa versão. Se mudou, avisamos em vez de sobrescrever. */
 const remoteVersions={}; // { chave: updated_at visto por último }
+// Registro dos timestamps que ESTA sessão gravou. Qualquer versão que esteja
+// aqui é trabalho nosso — nunca deve ser tratada como "outra pessoa editou".
+// Esta é a proteção de fundo: mesmo que alguma gravação escape do controle de
+// versão por outro caminho, ela não vai mais gerar alerta falso.
+const _ownWrites=new Set();
+function noteOwnWrite(stamp){
+  if(!stamp)return;
+  _ownWrites.add(stamp);
+  if(_ownWrites.size>50){ // mantém o conjunto pequeno
+    const first=_ownWrites.values().next().value;
+    _ownWrites.delete(first);
+  }
+}
 
 async function sbGetMeta(id){
   try{
@@ -4216,10 +4237,17 @@ async function _doCloudSave(key,value){
   if(known){
     const current=await sbGetMeta(key);
     if(current&&current!==known){
-      setSbBadge('offline','⚠ Conflito — salvo local');
-      vlWarn(`conflito de escrita em '${key}'`,`local viu ${known}, servidor está em ${current}`);
-      showConflictAlert(key);
-      return; // não sobrescreve o trabalho do outro
+      if(_ownWrites.has(current)){
+        // A versão no servidor foi gravada por esta própria sessão (ex: uma
+        // gravação anterior que não chegou a atualizar a referência). Não é
+        // conflito — só realinha e segue.
+        noteRemoteVersion(key,current);
+      } else {
+        setSbBadge('offline','⚠ Conflito — salvo local');
+        vlWarn(`conflito de escrita em '${key}'`,`local viu ${known}, servidor está em ${current}`);
+        showConflictAlert(key);
+        return; // não sobrescreve o trabalho do outro
+      }
     }
   }
 
@@ -4285,13 +4313,18 @@ function setP(id,ch){projects=projects.map(p=>p.id===id?{...p,...ch}:p);saveProj
 
 /* ── STAGE ORDER (reordenação por coluna) ───────────── */
 function loadOrders(){const s=lsGet("orders");if(s)stageOrders=s;}
+// Quando true, getOrder() não grava — usado durante a renderização.
+// Sem isso, renderizar o board podia disparar uma gravação, que mudava a
+// versão no servidor, que fazia o polling recarregar, que renderizava de
+// novo… um ciclo que gerava falsos alertas de conflito repetidamente.
+let _suppressOrderSave=false;
 function getOrder(sid){
   if(!stageOrders[sid]){
     stageOrders[sid]=projects.filter(p=>p.stage===sid).map(p=>p.id);
   }
   // garante que novos projetos aparecem mesmo sem estar no order salvo
   const extra=projects.filter(p=>p.stage===sid&&!stageOrders[sid].includes(p.id)).map(p=>p.id);
-  if(extra.length){stageOrders[sid]=[...stageOrders[sid],...extra];saveOrders();}
+  if(extra.length){stageOrders[sid]=[...stageOrders[sid],...extra];if(!_suppressOrderSave)saveOrders();}
   return stageOrders[sid];
 }
 function removeFromOrder(sid,id){
