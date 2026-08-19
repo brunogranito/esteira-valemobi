@@ -1143,6 +1143,12 @@ function getAllTags(){
       let m;while((m=re.exec(t)))set.add(m[1]);
     });
   });
+  // Tarefas avulsas também podem ter #tags — sem isto, uma tag usada só
+  // ali nunca aparecia como sugestão de reaproveitamento em lugar nenhum
+  getStandaloneTasks().forEach(t=>{
+    if(!t.tx)return;
+    let m;while((m=re.exec(t.tx)))set.add(m[1]);
+  });
   return[...set].sort();
 }
 
@@ -1266,12 +1272,18 @@ function _sugShow(el,type,query,triggerStart){
     items=allTags.filter(t=>t.toLowerCase().includes(q)).slice(0,7).map(t=>({label:"#"+t,sub:"",insert:"#"+t+" "}));
     if(query&&!allTags.some(t=>t.toLowerCase()===q)){
       items.push({label:"#"+query,sub:"nova tag",insert:"#"+query+" "});
+    } else if(!query&&!items.length){
+      // Nada digitado ainda e nenhuma tag existente no sistema pra sugerir.
+      // Sem isto, o popup simplesmente não aparecia ao digitar só "#" — dava
+      // a impressão de que o recurso não funcionava, quando só faltava
+      // continuar digitando pra poder oferecer "criar nova tag".
+      items.push({label:"Continue digitando para criar uma tag",sub:"",isHint:true});
     }
   }
   if(!items.length){_sugClose();return;}
   const box=_sugBox();
   box.innerHTML=items.map((it,i)=>
-    `<div data-idx="${i}" style="padding:7px 12px;cursor:pointer;font-size:12px;color:#EDEDF0;display:flex;justify-content:space-between;gap:10px;white-space:nowrap" onmousedown="event.preventDefault();_sugSelect(${i})">
+    `<div data-idx="${i}" style="padding:7px 12px;${it.isHint?"cursor:default;font-style:italic;color:#55566A":"cursor:pointer;color:#EDEDF0"};font-size:12px;display:flex;justify-content:space-between;gap:10px;white-space:nowrap" ${it.isHint?"":`onmousedown="event.preventDefault();_sugSelect(${i})"`}>
       <span>${it.label}</span>${it.sub?`<span style="color:#55566A;font-size:10px">${it.sub}</span>`:""}
     </div>`
   ).join("");
@@ -1286,6 +1298,7 @@ function _sugShow(el,type,query,triggerStart){
 function _sugSelect(idx){
   if(!_sugState)return;
   const it=_sugState.items[idx];const el=_sugState.el;
+  if(it.isHint)return; // item apenas informativo, sem ação
   if(it.isNewPerson){
     const triggerStart=_sugState.triggerStart,caret=el.selectionStart;
     _sugClose();
