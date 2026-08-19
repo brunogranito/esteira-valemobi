@@ -3619,6 +3619,10 @@ function startEditStandalone(id){
   const row=document.getElementById('st-row-'+id);if(!row)return;
   const t=getStandaloneTasks().find(t=>t.id===id);if(!t)return;
   const span=row.querySelector('.tp-task-txt');if(!span)return;
+  // Evita que "arrastar para reordenar" capture o gesto de selecionar texto
+  // com o mouse dentro do campo de edição — mesmo conflito já corrigido
+  // antes no checklist dos cards, faltava aqui nas Tarefas Avulsas.
+  row.draggable=false;
   const inp=document.createElement('input');inp.value=t.tx;
   inp.style.cssText='flex:1;background:rgba(20,21,31,.8);border:1px solid #D98E3F;color:#EDEDF0;padding:3px 8px;border-radius:4px;font-size:11px;outline:none';
   inp.onkeydown=e=>{if(e.key==='Enter')saveStandaloneEdit(id,inp.value);if(e.key==='Escape')renderTasksPanel();};
@@ -3626,6 +3630,8 @@ function startEditStandalone(id){
   span.replaceWith(inp);inp.focus();inp.select();
 }
 function saveStandaloneEdit(id,newTx){
+  const row=document.getElementById('st-row-'+id);
+  if(row)row.draggable=true; // restaura mesmo se o texto ficar vazio (early return abaixo)
   const txt=(newTx||'').trim();if(!txt)return;
   saveStandaloneTasks(getStandaloneTasks().map(t=>t.id===id?{...t,tx:txt}:t));renderTasksPanel();
 }
