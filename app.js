@@ -1454,27 +1454,22 @@ function deleteComment(cid){
 }
 
 // ── SINCRONIZAÇÃO PERIÓDICA (30s) ─────────────────────
-// Antes este bloco lia remote[0]?.updated_at — ou seja, procurava o campo
-// updated_at DENTRO do primeiro projeto do array, onde ele nunca existe
-// (updated_at é coluna da linha no banco, não campo do projeto). Resultado:
-// a comparação sempre dava 0 e a atualização automática nunca acontecia.
-// Agora consultamos o updated_at real da linha via sbGetMeta.
+// Atualiza o board sozinho quando alguém mexe nos dados em outro lugar.
+// Usa o updated_at real da linha no banco (bug antigo: comparava um campo
+// que não existia dentro dos projetos, e por isso nunca detectava mudança).
+let _lastSeenProjectsTs=null;
 setInterval(async()=>{
   if(document.hidden)return;
   try{
     const serverVersion=await sbGetMeta('projects');
     if(!serverVersion)return;
-    if(remoteVersions['projects']&&serverVersion===remoteVersions['projects'])return; // nada mudou
-    if(_ownWrites.has(serverVersion)){ // fomos nós que gravamos: só alinha e sai
-      noteRemoteVersion('projects',serverVersion);
-      return;
-    }
+    if(_lastSeenProjectsTs&&serverVersion===_lastSeenProjectsTs)return; // nada mudou
+    _lastSeenProjectsTs=serverVersion;
     const remote=await sbGet('projects');
     if(remote?.length){
       projects=remote;lsSet('projects',projects);
-      noteRemoteVersion('projects',serverVersion);
-      // Renderiza sem permitir que getOrder() grave — senão essa gravação
-      // mudaria a versão no servidor e realimentaria este mesmo polling
+      // Renderiza sem permitir que getOrder() grave — evita um efeito
+      // colateral onde o simples ato de desenhar a tela dispara uma gravação
       _suppressOrderSave=true;
       try{renderBoard();renderStats();}finally{_suppressOrderSave=false;}
       const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -4164,7 +4159,6 @@ async function sbSet(id,value,ts){
       body:JSON.stringify({id,value,updated_at:stamp})
     });
     if(!r.ok)vlWarn(`salvar '${id}' no Supabase`,`HTTP ${r.status}`);
-    if(r.ok)noteOwnWrite(stamp); // marca como trabalho desta sessão
     return r.ok?stamp:false;
   }catch(e){vlWarn(`salvar '${id}' no Supabase`,e);return false;}
 }
@@ -4175,23 +4169,7 @@ async function sbSet(id,value,ts){
    Se duas pessoas editam ao mesmo tempo, quem salva depois sobrescreve
    o trabalho de quem salvou antes — silenciosamente, sem erro.
    Para evitar isso, guardamos o 'updated_at' de cada chave no momento
-   em que a carregamos. Antes de salvar, conferimos se o servidor ainda
-   está nessa versão. Se mudou, avisamos em vez de sobrescrever. */
-const remoteVersions={}; // { chave: updated_at visto por último }
-// Registro dos timestamps que ESTA sessão gravou. Qualquer versão que esteja
-// aqui é trabalho nosso — nunca deve ser tratada como "outra pessoa editou".
-// Esta é a proteção de fundo: mesmo que alguma gravação escape do controle de
-// versão por outro caminho, ela não vai mais gerar alerta falso.
-const _ownWrites=new Set();
-function noteOwnWrite(stamp){
-  if(!stamp)return;
-  _ownWrites.add(stamp);
-  if(_ownWrites.size>50){ // mantém o conjunto pequeno
-    const first=_ownWrites.values().next().value;
-    _ownWrites.delete(first);
-  }
-}
-
+   em que a carregamos. */
 async function sbGetMeta(id){
   try{
     const r=await sbFetch(`esteira_data?id=eq.${encodeURIComponent(id)}&select=updated_at`);
@@ -4201,82 +4179,16 @@ async function sbGetMeta(id){
   }catch(e){return null;}
 }
 
-function noteRemoteVersion(key,updatedAt){
-  if(updatedAt)remoteVersions[key]=updatedAt;
-}
-
-function showConflictAlert(key){
-  const labels={projects:'os cards do board',orders:'a ordem dos cards',standaloneTasks:'as tarefas avulsas',
-    menu_people:'o cadastro de pessoas',menu_systems:'os sistemas e acessos',menu_templates:'os templates'};
-  const what=labels[key]||`os dados (${key})`;
-  let el=document.getElementById('conflictAlert');
-  if(!el){
-    el=document.createElement('div');
-    el.id='conflictAlert';
-    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:7000;display:flex;align-items:center;justify-content:center;padding:20px';
-    document.body.appendChild(el);
-  }
-  el.innerHTML=`<div style="background:#1C1D28;border:1px solid rgba(251,191,36,.45);border-radius:14px;padding:24px;width:min(460px,100%);box-shadow:0 20px 56px rgba(0,0,0,.65)">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#fbbf24;margin-bottom:10px">⚠ Alguém editou ao mesmo tempo</div>
-    <div style="font-size:12px;color:#D6D7E0;line-height:1.6;margin-bottom:8px">
-      Outra pessoa alterou <strong>${what}</strong> depois que esta página carregou.
-    </div>
-    <div style="font-size:12px;color:#A5A7B8;line-height:1.6;margin-bottom:18px">
-      Sua alteração <strong>não foi salva na nuvem</strong> para não apagar o trabalho da outra pessoa.
-      Ela continua guardada aqui neste navegador. Recarregue para ver a versão atualizada e refaça a mudança.
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="location.reload()" style="flex:1;background:linear-gradient(90deg,#D98E3F,#B5701F);border:none;color:#fff;padding:11px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Recarregar agora</button>
-      <button onclick="document.getElementById('conflictAlert').remove()" style="flex:1;background:none;border:1px solid rgba(85,86,106,.4);color:#8B8D9B;padding:11px;border-radius:8px;font-size:13px;cursor:pointer">Depois</button>
-    </div>
-  </div>`;
-  el.style.display='flex';
-}
-
-// Fila por chave: garante que duas gravações da MESMA chave nunca rodem em
-// paralelo. Sem isso, duas ações rápidas (ex: arrastar 2 cards seguidos)
-// podiam disparar um "falso conflito" — a 2ª gravação enxergava a versão que
-// a 1ª tinha acabado de escrever e achava que era outra pessoa mexendo.
-const _saveQueue={};
-
+// Dual write: localStorage (imediato) + Supabase (background). Sem verificação
+// de conflito — a última gravação sempre prevalece (comportamento removido a
+// pedido, por estar gerando alertas de falso conflito com frequência).
 async function cloudSave(key,value){
   lsSet(key,value);
   if(LS_ONLY.includes(key))return; // sensível: só localStorage
-  const prev=_saveQueue[key]||Promise.resolve();
-  const task=prev.then(()=>_doCloudSave(key,value)).catch(e=>vlWarn(`fila de gravação '${key}'`,e));
-  _saveQueue[key]=task;
-  return task;
-}
-
-async function _doCloudSave(key,value){
   setSbBadge('syncing','Salvando…');
-
-  // Confere se o servidor mudou desde a última vez que vimos esta chave
-  const known=remoteVersions[key];
-  if(known){
-    const current=await sbGetMeta(key);
-    if(current&&current!==known){
-      if(_ownWrites.has(current)){
-        // A versão no servidor foi gravada por esta própria sessão (ex: uma
-        // gravação anterior que não chegou a atualizar a referência). Não é
-        // conflito — só realinha e segue.
-        noteRemoteVersion(key,current);
-      } else {
-        setSbBadge('offline','⚠ Conflito — salvo local');
-        vlWarn(`conflito de escrita em '${key}'`,`local viu ${known}, servidor está em ${current}`);
-        showConflictAlert(key);
-        return; // não sobrescreve o trabalho do outro
-      }
-    }
-  }
-
-  // O timestamp é gerado aqui e usado diretamente como "versão conhecida" —
-  // sem buscar de novo no servidor depois, o que fechava a janela de corrida
-  const stamp=new Date().toISOString();
-  const ok=await sbSet(key,value,stamp);
+  const ok=await sbSet(key,value);
   const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   setSbBadge(ok?'synced':'offline', ok?`☁ Salvo às ${now}`:'⚠ Salvo local');
-  if(ok)noteRemoteVersion(key,stamp);
 }
 
 /* ── API KEY ────────────────────────────────────────── */
@@ -5926,40 +5838,20 @@ async function initApp(){
     ]);
 
     let updated=false;
-    let projectsRewritten=false, ordersRewritten=false;
     if(sbProjects?.length){
       projects=sbProjects;lsSet('projects',projects);updated=true;
     } else if(projects.length){
-      // Sem isto, um GET que falhou (ex: erro HTTP momentâneo) fazia esta
-      // gravação de recuperação escrever no servidor sem nunca atualizar a
-      // 'versão conhecida' — toda gravação seguinte na sessão detectava um
-      // conflito permanente e falso, mesmo sem ninguém mais editando.
-      projectsRewritten=true;
-      const stamp=new Date().toISOString();
-      sbSet('projects',projects,stamp).then(ok=>{if(ok)noteRemoteVersion('projects',stamp);}).catch(()=>{});
+      sbSet('projects',projects).catch(()=>{});
     }
 
     if(sbOrders&&Object.keys(sbOrders).length){
       stageOrders=sbOrders;lsSet('orders',stageOrders);
     } else if(Object.keys(stageOrders).length){
-      ordersRewritten=true;
-      const stamp=new Date().toISOString();
-      sbSet('orders',stageOrders,stamp).then(ok=>{if(ok)noteRemoteVersion('orders',stamp);}).catch(()=>{});
+      sbSet('orders',stageOrders).catch(()=>{});
     }
 
-    // Guarda a versão "vigente" — mas só para as chaves que NÃO acabamos de
-    // reescrever agora mesmo acima. Se buscássemos para as duas sempre, essa
-    // busca (mais lenta) podia responder DEPOIS da gravação de recuperação e
-    // sobrescrever a versão correta com uma desatualizada — reabrindo o
-    // mesmo problema de conflito permanente que a correção acima resolve.
-    const metaKeys=[];
-    if(!projectsRewritten)metaKeys.push('projects');
-    if(!ordersRewritten)metaKeys.push('orders');
-    if(metaKeys.length){
-      Promise.all(metaKeys.map(k=>sbGetMeta(k))).then(vals=>{
-        metaKeys.forEach((k,i)=>noteRemoteVersion(k,vals[i]));
-      }).catch(()=>{});
-    }
+    // Alinha a referência inicial que o polling usa pra saber se algo mudou
+    sbGetMeta('projects').then(v=>{if(v)_lastSeenProjectsTs=v;}).catch(()=>{});
 
     if(sbJiraCfg){
       const lj=lsGet('jira')||{};
