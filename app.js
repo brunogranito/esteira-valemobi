@@ -5076,9 +5076,11 @@ function renderCheck(){
 }
 
 // Escapa texto para uso seguro dentro de onclick='...' embutido em atributo HTML "...":
+// barra invertida vira \\ primeiro (senão "CORP\M492878" virava "CORPM492878" —
+// \M não é um código de escape válido em JS, então o navegador descartava a barra),
 // aspas simples viram \' (não quebra o literal JS) e aspas duplas viram &quot; (não quebra o atributo HTML)
 function escOnclick(s){
-  return String(s||"").replace(/'/g,"\\'").replace(/"/g,"&quot;");
+  return String(s||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/"/g,"&quot;");
 }
 function renderTaskRow(p,tid,task,isCustom,activeStage,sectionS,taskIds,_taskNum){
   const chk=(p.checks||{})[tid]||false;
