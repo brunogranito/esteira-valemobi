@@ -1,0 +1,4 @@
+
+# Nunca versionar credenciais (chave service_role do Supabase, etc.)
+.secrets/
+*.key
